@@ -114,7 +114,7 @@ def test_jev_request_names_a_model():
     inner._transport = httpx.MockTransport(transport)
     with pytest.raises(JevError):
         inner._post({"x": 1}, inner._monotonic())
-    assert seen["model"] == "jev-latest"
+    assert seen["model"] == "jev-1.14.0"
 
 
 def test_cached_input_tokens_are_counted():
@@ -136,3 +136,76 @@ def test_cached_input_tokens_are_counted():
         chat = BedrockChat("generation", client=client, bucket=TokenBucket(6000))
         _, usage = chat.converse_json("S", "U", {"type": "object"})
     assert usage.input_tokens == 1002
+
+
+def test_jev_api_key_env_wins_over_secret(monkeypatch):
+    from pydantic import SecretStr
+
+    import mel.settings as ms
+
+    class Sm:
+        def get_secret_value(self, SecretId):
+            raise AssertionError("Secrets Manager must not be read when JEV_API_KEY is set")
+
+    monkeypatch.setattr(ms, "settings", ms.Settings.from_env({"JEV_API_KEY": "from-env"}))
+    assert ms.settings.JEV_API_KEY == SecretStr("from-env")
+    assert RefreshingJevJudge("arn:x", Sm())._key() == "from-env"
+
+
+def test_failed_call_tokens_are_counted(scenarios, clock):
+    from mel.generate import ModelChoice, generate_survey
+    from mel.models import DecisionRecord, Insight, JudgeVerdict, SendWindow, Usage
+    from mel.providers.bedrock import ProviderError
+
+    sc = next(s for s in scenarios if s["name"].startswith("3-"))
+    pack = sc["survey_by_lang"]["en-IN"]
+    insight = Insight.model_validate(sc["insight"])
+    window = SendWindow.model_validate(pack["send_window"])
+    decision = DecisionRecord(insight_id=insight.insight_id, farmer_id=insight.farmer_id, survey=True,
+                              rule_id="R8", reason_code=None, timing_profile="golden_v1", send_window=window,
+                              created_at=clock.now())
+
+    class Gen:
+        calls = 0
+
+        def generate(self, *a, **k):
+            Gen.calls += 1
+            if Gen.calls == 1:
+                err = ProviderError("model output was cut off at max_tokens")
+                err.usage = Usage(model_id="m", input_tokens=3000, output_tokens=600, latency_ms=1.0, cost_usd=0.0006)
+                raise err
+            return {"items": pack["items"], "rationale": pack["rationale"]}, Usage(
+                model_id="m", input_tokens=3100, output_tokens=300, latency_ms=1.0, cost_usd=0.00046)
+
+    class Judge:
+        def check_survey(self, insight, survey):
+            return JudgeVerdict(ok=True, scores={})
+
+    res = generate_survey(insight, decision, window, "en-IN", Gen(), Judge(), clock, survey_seq=1,
+                          models=ModelChoice(generation="a", retry="b"))
+    assert res.status == "accepted"
+    assert [u.input_tokens for u in res.usage] == [3000, 3100]
+    assert abs(res.cost_usd - 0.00106) < 1e-12
+
+
+def test_cut_off_call_keeps_its_usage():
+    import boto3
+    import pytest
+    from botocore.stub import Stubber
+
+    from mel.providers.bedrock import BedrockChat, ProviderError
+    from mel.providers.ratelimit import TokenBucket
+
+    client = boto3.client("bedrock-runtime", region_name="us-west-2", aws_access_key_id="x",
+                          aws_secret_access_key="x")
+    with Stubber(client) as st:
+        st.add_response("converse", {
+            "output": {"message": {"role": "assistant", "content": [{"text": "{\"a\":"}]}},
+            "stopReason": "max_tokens",
+            "usage": {"inputTokens": 2900, "outputTokens": 600, "totalTokens": 3500},
+            "metrics": {"latencyMs": 5},
+        })
+        chat = BedrockChat("generation", client=client, bucket=TokenBucket(6000))
+        with pytest.raises(ProviderError) as info:
+            chat.converse_json("S", "U", {"type": "object"})
+    assert (info.value.usage.input_tokens, info.value.usage.output_tokens) == (2900, 600)

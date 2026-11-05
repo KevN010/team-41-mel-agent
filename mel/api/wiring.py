@@ -1,7 +1,8 @@
 """Build the real Services from the deployed environment. Used by the Lambda handler and mel.agent.
 
 Configuration (CLAUDE.md): MEL_* environment variables first, SSM parameters under /mel/ when a
-variable is unset. The Jev key is read from Secrets Manager (MEL_JEV_SECRET_ARN) and refreshed
+variable is unset. The Jev key is JEV_API_KEY when that env var is set; otherwise it is read from
+Secrets Manager (MEL_JEV_SECRET_ARN, the name infra deploys) and refreshed
 every JEV_KEY_TTL_S, so a key set by hand after deploy is picked up without a redeploy. The key
 value is never logged; a placeholder (REPLACE_ME) counts as no key, and the judge then fails closed
 (pending_review, jev_key_missing).
@@ -24,9 +25,9 @@ from mel.models import Insight, JudgeVerdict, Survey
 log = logging.getLogger("mel.wiring")
 
 JEV_KEY_TTL_S = 300.0
-# System One rejects a request without "model" (HTTP 422, checked live 2026-11-05). docs.typesafe.ai
-# lists jev-latest as the general-purpose model. JEV_MODEL overrides it.
-DEFAULT_JEV_MODEL = "jev-latest"
+# System One requires "model" (HTTP 422 without it). jev-1.14.0 is the model FarmerChat's working
+# client uses (Dwayne, 2026-11-05). JEV_MODEL overrides it.
+DEFAULT_JEV_MODEL = "jev-1.14.0"
 PLACEHOLDERS = {"", "REPLACE_ME", "replace_me", "CHANGEME"}
 SSM_NAMES = {
     "MEL_TABLE": "table_name",
@@ -91,6 +92,12 @@ class RefreshingJevJudge:
         return "RefreshingJevJudge(<key hidden>)"
 
     def _key(self) -> str | None:
+        # JEV_API_KEY (settings) wins when it is set; otherwise the secret named by MEL_JEV_SECRET_ARN,
+        # which is what infra puts on the Lambda and the container.
+        from mel.settings import settings
+
+        if settings.JEV_API_KEY is not None:
+            return parse_secret(settings.JEV_API_KEY.get_secret_value())
         if not self._arn:
             return None
         try:

@@ -60,7 +60,13 @@ _OUTPUT_KEYS = ("output_per_m", "output", "out")
 
 
 class ProviderError(Exception):
-    """A model call failed or returned something unusable. The message never holds model text."""
+    """A model call failed or returned something unusable. The message never holds model text.
+
+    ``usage`` is set when Bedrock answered (billed) but the output was unusable, for example cut at
+    max_tokens or not JSON, so the caller can still count the tokens of the failed call.
+    """
+
+    usage: Usage | None = None
 
 
 @dataclass(frozen=True)
@@ -284,7 +290,11 @@ class BedrockChat:
             "model_call model=%s in=%d out=%d latency_ms=%.0f", usage.model_id, in_tok, out_tok, latency_ms
         )
         self._emit_metrics(usage)
-        return self._extract(response), usage
+        try:
+            return self._extract(response), usage
+        except ProviderError as exc:
+            exc.usage = usage  # a failed call still counts
+            raise
 
     async def aconverse_json(self, *args: Any, **kwargs: Any) -> tuple[dict[str, Any], Usage]:
         """Async wrapper: runs converse_json in a worker thread. The shared bucket is thread safe."""

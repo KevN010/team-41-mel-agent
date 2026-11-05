@@ -134,12 +134,12 @@ def test_untrusted_text_only_in_state_never_in_questions(insight, survey):
     assert insight.advice_summary in json.dumps(state)
 
 
-def test_model_defaults_to_jev_1_14_0_and_can_be_overridden(insight, survey, monkeypatch):
+def test_model_defaults_to_jev_latest_and_can_be_overridden(insight, survey, monkeypatch):
     monkeypatch.delenv("JEV_MODEL", raising=False)
     fake = FakeJev(ok_response())
     judge, _ = make_judge(fake)
     judge.check_survey(insight, survey)
-    assert json.loads(fake.requests[0].content)["model"] == "jev-1.14.0"
+    assert json.loads(fake.requests[0].content)["model"] == "jev-latest"
     monkeypatch.setenv("JEV_MODEL", "from-env")
     fake = FakeJev(ok_response())
     judge, _ = make_judge(fake)
@@ -163,7 +163,7 @@ def test_request_body_matches_the_working_system_one_shape(insight, survey, monk
     assert request.headers["authorization"] == f"Bearer {KEY}"
     body = json.loads(request.content)
     assert set(body) == {"model", "state", "questions"}
-    assert body["model"] == "jev-1.14.0"
+    assert body["model"] == "jev-latest"
     assert isinstance(body["state"], dict)
     assert isinstance(body["questions"], dict) and list(body["questions"]) == list(JEV_CHECKS)
     for name, question in body["questions"].items():

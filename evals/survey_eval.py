@@ -281,6 +281,7 @@ def eval_generation() -> dict[str, Any]:
     from mel.judge import JevJudge
     from mel.providers.bedrock import BedrockChat, _default_client
     from mel.rules import decide
+    from mel.settings import settings
     from mel.timing import TimingException, send_window
     from mel.validate import validate_against_pack
 
@@ -369,6 +370,7 @@ def eval_generation() -> dict[str, Any]:
                   "price_output_per_m": getattr(spec, "output_per_m", None),
                   "price_verified": False},
         "language": SCENARIO_LANGUAGE,
+        "max_tokens": settings.MAX_TOKENS,
         "jev_key_status": key_status,
         "jev": {"model": getattr(judge.inner, "_model", None), "http_errors": transport.errors},
         "scenarios": rows,
@@ -551,8 +553,11 @@ def build_report(res: dict[str, Any], inventory: dict[str, Any] | None) -> str:
         w(f"NOT RUN: {res['generation_skipped']}\n")
     else:
         s, m = g["summary"], g["model"]
-        w(f"Model `{m['generation']}` (retry `{m['retry']}`), language {g['language']}, one run per scenario, "
-          f"live Jev judge (key status: {g['jev_key_status']}).\n")
+        override = " (Dwayne's override of the 600 in CLAUDE.md, set with the MAX_TOKENS env var)" \
+            if g.get("max_tokens") != 600 else ""
+        w(f"Model `{m['generation']}` (retry `{m['retry']}`), **max_tokens {g.get('max_tokens')}**{override}, "
+          f"language {g['language']}, one run per scenario, live Jev judge model `{g['jev']['model']}` "
+          f"(key status: {g['jev_key_status']}).\n")
         w("| Metric | Value |\n|---|---|")
         w(f"| Scenarios run | {s['scenarios_run']} |")
         w(f"| Schema valid (our validator) | {s['schema_valid']}/{s['scenarios_run']} = "
@@ -571,6 +576,7 @@ def build_report(res: dict[str, Any], inventory: dict[str, Any] | None) -> str:
         jevd = g["jev"]
         verdicts = s["jev_verdicts"]
         jev_up = verdicts.get("ok", 0) + verdicts.get("not_ok", 0) > 0
+        w(f"| Jev pass count (verdict ok) | {verdicts.get('ok', 0)}/{s['scenarios_run']} |")
         w(f"| Jev | {'available' if jev_up else 'UNAVAILABLE'}; model `{jevd['model']}`; verdicts "
           + (", ".join(f"{k}: {v}" for k, v in sorted(verdicts.items())) or "none") + " |")
         w(f"| Cost per generated survey | {_fmt_usd(s['cost_per_generated_survey_usd'])} |")
@@ -611,6 +617,20 @@ def build_report(res: dict[str, Any], inventory: dict[str, Any] | None) -> str:
         if s["unmetered_calls_estimated"]:
             findings.append(f"{s['unmetered_calls_estimated']} call(s) raised before any response; they are counted "
                             "at the median input tokens of the metered calls and no output (estimate).")
+        for r in ran:
+            if r["attempts"] > 1 and r["status"] != "failed_review":
+                stops = ", ".join(str(c.get("stop_reason")) for c in r["calls"])
+                findings.append(f"{r['scenario']} needed {r['attempts']} attempts; the retry produced the accepted "
+                                f"survey. First-attempt reasons: {'; '.join(x for x in r['reasons'] if x.startswith('attempt1'))}. "
+                                f"Stop reasons per call: {stops}; output tokens per call: "
+                                f"{', '.join(str(c['output_tokens']) for c in r['calls'])} (max_tokens {g.get('max_tokens')}).")
+        scored = [(r["jev"]["scores"].get("matches_advice"), r["scenario"]) for r in ran
+                  if r["jev"] and r["jev"]["scores"].get("matches_advice") is not None]
+        if scored:
+            low = min(scored)
+            findings.append(f"Closest Jev score to its threshold: matches_advice {low[0]} on {low[1]} "
+                            "(accept needs at least the matches_advice threshold, 0.5 by default; the other four "
+                            "checks must be at or below theirs).")
         findings.append("Token counts are all input tokens per call (Converse `totalTokens` minus output), cached "
                         "or not; spend covers every response received, failed parses included. A call that raised "
                         "before any response carries no usage and is not metered.")

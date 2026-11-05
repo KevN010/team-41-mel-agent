@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 RETRYABLE_STATUS = {429, 500, 502, 503, 504, 529}
 ALLOWED_HOSTS = {"api.typesafe.ai"}  # the bearer key is only ever sent here
-DEFAULT_MODEL = "jev-1.14.0"  # System One needs a `model` field; the JEV_MODEL env var overrides this
+DEFAULT_MODEL = "jev-latest"  # System One needs a `model` field; the JEV_MODEL env var overrides this
 MAX_RETRIES = 2  # 1 try + 2 retries
 DEADLINE_S = 6.0  # total time including retries; a Jev outage costs seconds, not minutes
 MAX_RETRY_DELAY_S = 2.0

@@ -1,6 +1,6 @@
 # mel-agent evidence report
 
-Generated 2026-11-05T07:24:11-05:00 by `evals/survey_eval.py`. Region us-west-2. Numbers below come from `evidence/survey_eval.json` and `evidence/inventory.json`; a section that could not run says so and carries no numbers.
+Generated 2026-11-05T07:48:49-05:00 by `evals/survey_eval.py`. Region us-west-2. Numbers below come from `evidence/survey_eval.json` and `evidence/inventory.json`; a section that could not run says so and carries no numbers.
 
 ## 1. Decision rules on the golden set
 
@@ -33,35 +33,40 @@ Contradictions: none.
 
 ## 4. Generation on the 5 actionable scenarios
 
-Model `global.openai.gpt-6-luna` (retry `global.openai.gpt-6-luna`), language en-IN, one run per scenario, live Jev judge (key status: loaded).
+Model `global.openai.gpt-6-luna` (retry `global.openai.gpt-6-luna`), **max_tokens 900** (Dwayne's override of the 600 in CLAUDE.md, set with the MAX_TOKENS env var), language en-IN, one run per scenario, live Jev judge model `jev-latest` (key status: loaded).
 
 | Metric | Value |
 |---|---|
 | Scenarios run | 5 |
-| Schema valid (our validator) | 4/5 = 0.80 |
-| Accepted (schema valid and Jev ok) | 0/5 |
-| Jev verdicts | no_verdict: 1, pending_review: 4 |
+| Schema valid (our validator) | 5/5 = 1.00 |
+| Accepted (schema valid and Jev ok) | 5/5 |
+| Jev verdicts | ok: 5 |
 | Model calls | 7 |
-| Latency p50 / p95 per model call | 2,594 ms / 3,318 ms |
-| Tokens in / out (total) | 20,348 / 3,509 |
-| Cost per accepted survey | n/a (0 accepted) |
-| Cost per generated survey | $0.000758 |
-| Total spend of this run (Bedrock) | $0.003789 |
+| Latency p50 / p95 per model call | 2,577 ms / 4,105 ms |
+| Tokens in / out, all calls | 20,349 / 4,110 |
+| Of which failed calls (2) in / out | 5,804 / 1,337 ($0.001249) |
+| Cost per accepted survey, failed calls counted | $0.000818 |
+| Cost per accepted survey, successful calls only | $0.000568 |
+| Jev pass count (verdict ok) | 5/5 |
+| Jev | available; model `jev-latest`; verdicts ok: 5 |
+| Cost per generated survey | $0.000818 |
+| Total spend of this run (Bedrock) | $0.004090 |
 
 Prices used: $0.1 in / $0.5 out per 1M tokens, from the CLAUDE.md model table. They are **unverified**, so cost figures are estimates. Jev usage is not billed through Bedrock and is not in the total.
 
 | Scenario | Status | Attempts | Schema | Jev | Calls ms | Tokens in/out | Cost |
 |---|---|---|---|---|---|---|---|
-| 1-mustard-aphid-spray | pending_review | 1 | valid | pending_review: jev_http_422 | 1629 | 2881/321 | $0.000449 |
-| 2-wheat-irrigation-timing | pending_review | 1 | valid | pending_review: jev_http_422 | 2699 | 2896/564 | $0.000572 |
-| 3-potato-blight-wait | pending_review | 2 | valid | pending_review: jev_http_422 | 2014/2594 | 5858/1008 | $0.001090 |
-| 4-cow-vet-escalation | pending_review | 1 | valid | pending_review: jev_http_422 | 2195 | 2886/416 | $0.000497 |
-| 5-wheat-variety-plan | failed_review | 2 | invalid | no verdict | 3197/3318 | 5827/1200 | $0.001183 |
+| 1-mustard-aphid-spray | accepted | 1 | valid | ok | 1936 | 2881/362 | $0.000469 |
+| 2-wheat-irrigation-timing | accepted | 1 | valid | ok | 2577 | 2896/561 | $0.000570 |
+| 3-potato-blight-wait | accepted | 2 | valid | ok | 1901/2839 | 5859/1079 | $0.001125 |
+| 4-cow-vet-escalation | accepted | 1 | valid | ok | 1731 | 2886/347 | $0.000462 |
+| 5-wheat-variety-plan | accepted | 2 | valid | ok | 4105/3884 | 5827/1761 | $0.001463 |
 
 Findings:
 
-- Jev did not return scores on 4 of 5 surveys (jev_http_422). Those verdicts are `pending_review` from a Jev error, not a quality judgment, so they say nothing about the surveys and nothing was accepted because of them.
-- 5-wheat-variety-plan: failed review after 2 attempts (attempt1: generator_error:ProviderError; attempt2: generator_error:ProviderError). Stop reasons of the metered responses: max_tokens, max_tokens.
+- 3-potato-blight-wait needed 2 attempts; the retry produced the accepted survey. First-attempt reasons: attempt1: schema:$.items[1].options[3].label; attempt1: $.items[1].options[3].label: 25 code points, at most 20 allowed (INV-LABEL). Stop reasons per call: end_turn, end_turn; output tokens per call: 437, 642 (max_tokens 900).
+- 5-wheat-variety-plan needed 2 attempts; the retry produced the accepted survey. First-attempt reasons: attempt1: generator_error:ProviderError. Stop reasons per call: max_tokens, end_turn; output tokens per call: 900, 861 (max_tokens 900).
+- Closest Jev score to its threshold: matches_advice 0.58 on 4-cow-vet-escalation (accept needs at least the matches_advice threshold, 0.5 by default; the other four checks must be at or below theirs).
 - Token counts are all input tokens per call (Converse `totalTokens` minus output), cached or not; spend covers every response received, failed parses included. A call that raised before any response carries no usage and is not metered.
 
 ## 5. Model selection

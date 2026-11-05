@@ -1,0 +1,12 @@
+generation: global.openai.gpt-6-luna
+retry: global.openai.gpt-6-luna
+region: us-west-2
+max_tokens: 600
+prices:
+  global.openai.gpt-6-luna:
+    input_per_m: 0.1
+    output_per_m: 0.5
+    source: CLAUDE.md model table (marked 'verify')
+    verified: false
+chosen_because: global.openai.gpt-6-luna passed 15/15 (1.00) at $0.000210 per accepted
+  survey (price unverified); retry global.openai.gpt-6-luna passed 15/15.

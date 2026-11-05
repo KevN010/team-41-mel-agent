@@ -1,0 +1,551 @@
+{
+  "global.openai.gpt-6-luna": {
+    "profile": "global.openai.gpt-6-luna",
+    "runs": 15,
+    "accepted": 15,
+    "pass_rate": 1.0,
+    "avg_in_tokens": 1180,
+    "avg_out_tokens": 183.8,
+    "latency_p50_ms": 1146,
+    "max_tokens_stops": 0,
+    "price": {
+      "input_per_m": 0.1,
+      "output_per_m": 0.5,
+      "source": "CLAUDE.md model table (marked 'verify')",
+      "verified": false
+    },
+    "cost_total": 0.0031485,
+    "cost_per_accepted": 0.00020989999999999998,
+    "failures": {},
+    "rows": [
+      {
+        "scenario": "1-mustard-aphid-spray",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 1253,
+        "in_tokens": 1167,
+        "out_tokens": 197,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "1-mustard-aphid-spray",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 817,
+        "in_tokens": 1167,
+        "out_tokens": 137,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "1-mustard-aphid-spray",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 1133,
+        "in_tokens": 1167,
+        "out_tokens": 149,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "2-wheat-irrigation-timing",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 1233,
+        "in_tokens": 1183,
+        "out_tokens": 223,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "2-wheat-irrigation-timing",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 1196,
+        "in_tokens": 1183,
+        "out_tokens": 216,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "2-wheat-irrigation-timing",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 1087,
+        "in_tokens": 1183,
+        "out_tokens": 205,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "3-potato-blight-wait",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 1146,
+        "in_tokens": 1189,
+        "out_tokens": 216,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "3-potato-blight-wait",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 880,
+        "in_tokens": 1189,
+        "out_tokens": 142,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "3-potato-blight-wait",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 1326,
+        "in_tokens": 1189,
+        "out_tokens": 159,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "4-cow-vet-escalation",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 988,
+        "in_tokens": 1173,
+        "out_tokens": 189,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "4-cow-vet-escalation",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 1232,
+        "in_tokens": 1173,
+        "out_tokens": 207,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "4-cow-vet-escalation",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 1147,
+        "in_tokens": 1173,
+        "out_tokens": 231,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "5-wheat-variety-plan",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 1024,
+        "in_tokens": 1188,
+        "out_tokens": 188,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "5-wheat-variety-plan",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 871,
+        "in_tokens": 1188,
+        "out_tokens": 138,
+        "stop_reason": "end_turn"
+      },
+      {
+        "scenario": "5-wheat-variety-plan",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 1186,
+        "in_tokens": 1188,
+        "out_tokens": 160,
+        "stop_reason": "end_turn"
+      }
+    ],
+    "features_dropped": [],
+    "features_used": [
+      "format",
+      "reasoning"
+    ]
+  },
+  "global.anthropic.claude-haiku-4-5-20251001-v1:0": {
+    "profile": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "runs": 15,
+    "accepted": 9,
+    "pass_rate": 0.6,
+    "avg_in_tokens": 2155.8,
+    "avg_out_tokens": 230.2,
+    "latency_p50_ms": 1800,
+    "max_tokens_stops": 0,
+    "price": {
+      "input_per_m": 1.0,
+      "output_per_m": 5.0,
+      "source": "Anthropic list price, not in CLAUDE.md",
+      "verified": false
+    },
+    "cost_total": 0.049602,
+    "cost_per_accepted": 0.005511333333333333,
+    "failures": {
+      "call_or_parse_error: AttributeError: 'str' object has no attribute 'get'": 2,
+      "$.items[N].options[N].label: maxLength": 2,
+      "label longer than N code points": 2,
+      "$.rationale: minLength": 2
+    },
+    "rows": [
+      {
+        "scenario": "1-mustard-aphid-spray",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 2141,
+        "in_tokens": 2143,
+        "out_tokens": 267,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "1-mustard-aphid-spray",
+        "run": 1,
+        "pass": false,
+        "errors": [
+          "call_or_parse_error: AttributeError: 'str' object has no attribute 'get'"
+        ],
+        "ms": 2073,
+        "in_tokens": 2143,
+        "out_tokens": 255,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "1-mustard-aphid-spray",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 2126,
+        "in_tokens": 2143,
+        "out_tokens": 280,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "2-wheat-irrigation-timing",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 1573,
+        "in_tokens": 2161,
+        "out_tokens": 203,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "2-wheat-irrigation-timing",
+        "run": 1,
+        "pass": false,
+        "errors": [
+          "$.items[0].options[2].label: maxLength",
+          "label longer than 20 code points"
+        ],
+        "ms": 1884,
+        "in_tokens": 2161,
+        "out_tokens": 234,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "2-wheat-irrigation-timing",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 1664,
+        "in_tokens": 2161,
+        "out_tokens": 209,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "3-potato-blight-wait",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 1599,
+        "in_tokens": 2162,
+        "out_tokens": 192,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "3-potato-blight-wait",
+        "run": 1,
+        "pass": false,
+        "errors": [
+          "call_or_parse_error: AttributeError: 'str' object has no attribute 'get'"
+        ],
+        "ms": 1537,
+        "in_tokens": 2162,
+        "out_tokens": 193,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "3-potato-blight-wait",
+        "run": 2,
+        "pass": false,
+        "errors": [
+          "$.items[1].options[1].label: maxLength",
+          "label longer than 20 code points"
+        ],
+        "ms": 1575,
+        "in_tokens": 2162,
+        "out_tokens": 192,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "4-cow-vet-escalation",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 1800,
+        "in_tokens": 2148,
+        "out_tokens": 220,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "4-cow-vet-escalation",
+        "run": 1,
+        "pass": false,
+        "errors": [
+          "$.rationale: minLength"
+        ],
+        "ms": 1634,
+        "in_tokens": 2148,
+        "out_tokens": 198,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "4-cow-vet-escalation",
+        "run": 2,
+        "pass": false,
+        "errors": [
+          "$.rationale: minLength"
+        ],
+        "ms": 1804,
+        "in_tokens": 2148,
+        "out_tokens": 208,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "5-wheat-variety-plan",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 2030,
+        "in_tokens": 2165,
+        "out_tokens": 280,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "5-wheat-variety-plan",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 1718,
+        "in_tokens": 2165,
+        "out_tokens": 253,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "5-wheat-variety-plan",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 2025,
+        "in_tokens": 2165,
+        "out_tokens": 269,
+        "stop_reason": "tool_use"
+      }
+    ],
+    "features_dropped": [],
+    "features_used": [
+      "tool_use"
+    ]
+  },
+  "global.anthropic.claude-haiku-5-5": {
+    "profile": "global.anthropic.claude-haiku-5-5",
+    "runs": 15,
+    "accepted": 13,
+    "pass_rate": 0.8666666666666667,
+    "avg_in_tokens": 2448.6,
+    "avg_out_tokens": 337.4,
+    "latency_p50_ms": 2025,
+    "max_tokens_stops": 0,
+    "price": null,
+    "cost_total": null,
+    "cost_per_accepted": null,
+    "failures": {
+      "$.items[N].options[N].label: maxLength": 2,
+      "label longer than N code points": 2
+    },
+    "rows": [
+      {
+        "scenario": "1-mustard-aphid-spray",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 2121,
+        "in_tokens": 2428,
+        "out_tokens": 387,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "1-mustard-aphid-spray",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 2001,
+        "in_tokens": 2428,
+        "out_tokens": 379,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "1-mustard-aphid-spray",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 2180,
+        "in_tokens": 2428,
+        "out_tokens": 381,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "2-wheat-irrigation-timing",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 1811,
+        "in_tokens": 2448,
+        "out_tokens": 289,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "2-wheat-irrigation-timing",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 1684,
+        "in_tokens": 2448,
+        "out_tokens": 304,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "2-wheat-irrigation-timing",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 2011,
+        "in_tokens": 2448,
+        "out_tokens": 286,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "3-potato-blight-wait",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 2286,
+        "in_tokens": 2459,
+        "out_tokens": 310,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "3-potato-blight-wait",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 1998,
+        "in_tokens": 2459,
+        "out_tokens": 294,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "3-potato-blight-wait",
+        "run": 2,
+        "pass": false,
+        "errors": [
+          "$.items[1].options[1].label: maxLength",
+          "label longer than 20 code points"
+        ],
+        "ms": 1755,
+        "in_tokens": 2459,
+        "out_tokens": 286,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "4-cow-vet-escalation",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 2100,
+        "in_tokens": 2442,
+        "out_tokens": 318,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "4-cow-vet-escalation",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 2323,
+        "in_tokens": 2442,
+        "out_tokens": 309,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "4-cow-vet-escalation",
+        "run": 2,
+        "pass": true,
+        "errors": [],
+        "ms": 3364,
+        "in_tokens": 2442,
+        "out_tokens": 419,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "5-wheat-variety-plan",
+        "run": 0,
+        "pass": true,
+        "errors": [],
+        "ms": 1966,
+        "in_tokens": 2466,
+        "out_tokens": 365,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "5-wheat-variety-plan",
+        "run": 1,
+        "pass": true,
+        "errors": [],
+        "ms": 2025,
+        "in_tokens": 2466,
+        "out_tokens": 360,
+        "stop_reason": "tool_use"
+      },
+      {
+        "scenario": "5-wheat-variety-plan",
+        "run": 2,
+        "pass": false,
+        "errors": [
+          "$.items[1].options[2].label: maxLength",
+          "label longer than 20 code points"
+        ],
+        "ms": 2672,
+        "in_tokens": 2466,
+        "out_tokens": 374,
+        "stop_reason": "tool_use"
+      }
+    ],
+    "features_dropped": [],
+    "features_used": [
+      "tool_use"
+    ]
+  }
+}

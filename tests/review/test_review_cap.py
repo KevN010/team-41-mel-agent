@@ -1,14 +1,11 @@
 """Review item 3: frequency cap. rules.json frequency_cap = 1 survey per farmer per 7 days.
 
-The ledger has cap_count / record_cap (idempotent per survey_id, so a retried delivery would
-count once), but no code in mel/ calls either one. An outcome that counts toward the cap
-(outcome_codes.json counts_toward_cap: true) is stored and the cap stays at 0, so the cap is
-never enforced on our side and a farmer can be surveyed again and again.
+On main at 816b4a7 no code called cap_count or record_cap, so the cap was never enforced.
+PR #23 records the cap in intake and checks it in run_decision. These are now regression tests:
+they need PR #23 on main.
 """
 
 from __future__ import annotations
-
-import pytest
 
 from mel import fixtures
 from mel.api.intake import submit_response
@@ -18,7 +15,6 @@ from mel.outcomes import apply_event
 from ._harness import ORG, identity_for, sc3_parts
 
 
-@pytest.mark.xfail(strict=True, reason="REVIEW item 3: no code path calls ledger.record_cap")
 def test_counting_outcome_is_recorded_against_the_cap(clock):
     _insight, survey, handoff = sc3_parts()
     ledger = InMemoryLedger()
@@ -34,7 +30,6 @@ def test_counting_outcome_is_recorded_against_the_cap(clock):
     assert ledger.cap_count(ORG, survey.farmer_id, 7, clock.now()) == 1
 
 
-@pytest.mark.xfail(strict=True, reason="REVIEW item 3: run_decision never reads ledger.cap_count")
 def test_second_normal_priority_survey_inside_cap_window_is_not_scheduled(clock):
     from datetime import timedelta
 

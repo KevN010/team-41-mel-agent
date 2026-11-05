@@ -2,13 +2,11 @@
 
 run_decision checks ledger.is_opted_out (step 3), then spends seconds in generation and Jev,
 then writes the survey and hand-off with plain puts (step 5). An opt-out that lands during
-generation is not seen: the hand-off is stored and the survey goes to FarmerChat anyway.
-ledger.put_attempt has the right guarded write (ConditionCheck on OPTOUT), but nothing calls it.
+generation was not seen on main at 816b4a7. PR #23 re-checks the opt-out right before the writes.
+This is now a regression test: it needs PR #23 on main.
 """
 
 from __future__ import annotations
-
-import pytest
 
 from mel.api.decide import run_decision
 from mel.ledger_mem import InMemoryLedger
@@ -16,7 +14,6 @@ from mel.ledger_mem import InMemoryLedger
 from ._harness import ORG, accepted, decide_deps, identity_for, sc3_parts
 
 
-@pytest.mark.xfail(strict=True, reason="REVIEW item 5: survey/hand-off writes are not conditional on OPTOUT")
 def test_opt_out_during_generation_blocks_the_handoff(clock):
     insight, survey, handoff = sc3_parts()
     ledger = InMemoryLedger()

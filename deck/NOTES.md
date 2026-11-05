@@ -129,15 +129,12 @@ Sources read on 2026-11-05: main at 5e0b278, evidence/REPORT.md from PR #25, REV
 | 5 | 5 of 5 | surveys accepted (schema valid and Jev ok) | evidence/REPORT.md section 4 |
 | 5 | 2,577 ms, 4,105 ms | latency p50 and p95 per model call | evidence/REPORT.md section 4 |
 | 5 | 7 | model calls in the eval run | evidence/REPORT.md section 4 |
-| 5 | 15 of 15 | model-selection pass count for gpt-6-luna | models/results/model_select.md; evidence/REPORT.md section 5 |
 | 5 | 15, 12 | review items, and items closed with PR #23 | REVIEW.md (PR #21) |
 | footer | 6:00, 5:00 | talk length and amber point | the task brief |
 
 ## Pending chips
 
-Each chip is amber on the slide.
-
-1. Slide 5, cost row: prompt caching. evidence/REPORT.md, KNOWN-ISSUES.md and infra/INFRA.md do not say the build uses it.
+None. Dwayne removed the prompt caching claim on 2026-11-05, because it was not measured.
 
 ## Disagreements with the pack, the brief and the sources
 
@@ -145,7 +142,7 @@ Each chip is amber on the slide.
 - The brief asks for "least-privilege IAM, one role per component". KNOWN-ISSUES.md says Lambda and AgentCore share one role (review item 10). The slide says "IAM policies list explicit actions" instead.
 - The brief asks for end-to-end p50 and p95 latency. evidence/REPORT.md gives latency per model call only. The tile says "for each model call".
 - The brief asks for cost per accepted survey. evidence/REPORT.md gives 2 values. The tile shows $0.000818 (failed calls counted) and names $0.000568. Prices are unverified in both.
-- The brief asks for "the cheapest Bedrock model chosen by eval". models/results/model_select.md has no price for claude-haiku-5-5, so "cheapest" is not proven. The slide says "the lowest priced cost".
+- The cost row uses Dwayne's text: "cheapest Bedrock model chosen by eval: gpt-6-luna, 5 of 5 accepted". models/results/model_select.md has no price for claude-haiku-5-5, so "cheapest" is not proven against that model. Prices are unverified.
 - CLAUDE.md and models/models.yaml set max_tokens 600. The eval run used 900 (evidence/REPORT.md section 4). Slide 3 shows both.
 - The adversarial review count is from REVIEW.md: 12 of 15 items are closed with PR #23. PR #23 is not merged at the time of writing. Update the slide when the integration PR for items 4, 5 and 10 merges.
 - DEMO.md times its 6 steps as a full 6:00 talk. This deck gives the demo 2:00 (3:10 to 5:10). The presenter must choose which steps to run live.

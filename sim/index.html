@@ -1,0 +1,1259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>MEL survey simulator</title>
+<style>
+:root{--bg:#f6f7f4;--card:#fff;--ink:#1d2b22;--mut:#5b6b60;--line:#d9dfd6;--brand:#1f6b3a;--brand-ink:#fff;--warn:#9a5b00;--warn-bg:#fff3d9;--bad:#a4261b;--bad-bg:#fde7e4;--ok:#17612f;--ok-bg:#e1f4e6;--sheet:#fff;--chat:#e9efe6;--bubble-in:#fff;--bubble-out:#d6efc9}
+@media (prefers-color-scheme:dark){:root{--bg:#121714;--card:#1b231e;--ink:#e6efe8;--mut:#9fb0a4;--line:#2f3b33;--brand:#4fb072;--brand-ink:#08140c;--warn:#f2c36b;--warn-bg:#3a2d0c;--bad:#ff9d92;--bad-bg:#431a16;--ok:#8fe0a8;--ok-bg:#153322;--sheet:#222d26;--chat:#16201a;--bubble-in:#26332b;--bubble-out:#2f5a3c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;max-width:1100px;margin:0 auto}
+h1{font-size:1.2rem;margin:0}
+h2{font-size:1rem;margin:0 0 8px;display:flex;gap:8px;align-items:center}
+h2 .n{background:var(--brand);color:var(--brand-ink);border-radius:50%;width:1.6em;height:1.6em;display:inline-flex;align-items:center;justify-content:center;font-size:.85rem}
+#modebar{padding:8px 16px;font-weight:600;text-align:center;font-size:.9rem}
+#modebar.live{background:var(--ok-bg);color:var(--ok)}
+#modebar.replay{background:#c0121f;color:#fff;letter-spacing:.02em}
+main{max-width:1100px;margin:0 auto;padding:0 16px 48px;display:grid;gap:12px;grid-template-columns:1fr}
+@media (min-width:900px){main{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+label{display:block;font-size:.8rem;color:var(--mut);margin:8px 0 2px}
+input[type=text],input[type=password],select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.grid2{display:grid;grid-template-columns:1fr;gap:0 12px}
+@media (min-width:560px){.grid2{grid-template-columns:1fr 1fr}}
+.btn{padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;cursor:pointer;min-height:40px}
+.btn:hover{border-color:var(--brand)}
+.btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:600;margin-top:10px}
+.btn.small{padding:3px 8px;min-height:28px;font-size:.8rem;margin-left:8px}
+.btn.ghost{color:var(--mut)}
+.btn.warnbtn{border-color:var(--warn);color:var(--warn)}
+.btn.dangerbtn{border-color:var(--bad);color:var(--bad)}
+.btn:disabled,.opt:disabled{opacity:.45;cursor:not-allowed}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.78rem;border:1px solid var(--line);margin:2px 4px 2px 0;color:var(--mut)}
+.chip.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.chip.warn{background:var(--warn-bg);color:var(--warn);border-color:transparent}
+.chip.bad{background:var(--bad-bg);color:var(--bad);border-color:transparent}
+.muted{color:var(--mut);font-size:.85rem;margin:6px 0}
+.kv{display:flex;gap:8px;font-size:.88rem;padding:1px 0}.kv .k{color:var(--mut);min-width:9.5em}.kv .v{word-break:break-word}
+.insight{border:1px dashed var(--line);border-radius:8px;padding:8px;margin:8px 0}
+.insight .q{margin:6px 0 0;font-size:.88rem}
+.result{margin-top:10px}
+.win{background:var(--ok-bg);color:var(--ok);padding:8px 10px;border-radius:8px;margin:8px 0}
+.alert{background:var(--bad-bg);color:var(--bad);padding:8px 10px;border-radius:8px;font-weight:600}
+.replaytag{color:#c0121f;font-weight:700;font-size:.8rem;margin:6px 0}
+#status{padding:10px 12px;border-radius:8px;background:var(--bad-bg);color:var(--bad);margin:0 0 4px}
+pre.json{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;overflow:auto;max-height:320px;font-size:.75rem;margin:6px 0}
+details>summary{cursor:pointer;color:var(--mut);font-size:.85rem;margin:6px 0}
+.guide{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.guide li{display:flex;gap:10px;padding:8px;border:1px solid var(--line);border-radius:8px}
+.guide li.cur{border-color:var(--brand);box-shadow:0 0 0 2px var(--ok-bg)}
+.guide li.done{opacity:.7}
+.gn{flex:none;width:1.8em;height:1.8em;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem}
+.guide li.done .gn{background:var(--ok);color:var(--card)}
+.gd{font-size:.88rem;color:var(--mut)}
+.clock{font-size:1.4rem;font-weight:700}.clockiso{font-size:.78rem;color:var(--mut);margin-bottom:4px}
+.toggle{display:flex;gap:6px;align-items:center;font-size:.88rem;color:var(--ink);margin-top:6px}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.tab{padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;cursor:pointer;text-transform:capitalize}
+.tab.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.tab small{opacity:.8}
+.locked{background:var(--warn-bg);color:var(--warn);padding:8px 10px;border-radius:8px;font-size:.88rem;margin:0 0 8px}
+.locked.ok{background:var(--ok-bg);color:var(--ok)}
+.phone{position:relative;width:100%;max-width:360px;height:620px;margin:0 auto;border:6px solid #222;border-radius:26px;overflow:hidden;background:var(--chat)}
+.chatbg{padding:14px 12px;display:flex;flex-direction:column;gap:8px;font-size:.88rem}
+.bubble{max-width:88%;padding:8px 10px;border-radius:12px;background:var(--bubble-in);box-shadow:0 1px 1px rgba(0,0,0,.08);word-break:break-word}
+.bubble.in{align-self:flex-start}.bubble.out{align-self:flex-end;background:var(--bubble-out)}
+.hint{align-self:center;font-size:.72rem;color:var(--mut)}
+.push{align-self:stretch;background:#263238;color:#fff;border-radius:10px;padding:8px 10px;font-size:.82rem}
+.sheet{max-height:92%;overflow:auto;position:absolute;left:0;right:0;bottom:0;background:var(--sheet);border-radius:18px 18px 0 0;padding:10px 14px 14px;box-shadow:0 -6px 18px rgba(0,0,0,.25);animation:up .25s ease-out}
+@keyframes up{from{transform:translateY(40%);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.grab{width:42px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 8px}
+.shead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.x{border:0;background:transparent;font-size:1.5rem;line-height:1;color:var(--mut);cursor:pointer;min-width:40px;min-height:40px}
+.step{font-size:.78rem;color:var(--mut);margin:2px 0}
+.qtext{font-weight:600;margin:4px 0 10px}
+.opts{display:grid;gap:5px}.opts.row{grid-template-columns:repeat(5,1fr)}
+.opt{padding:10px;border-radius:10px;border:1px solid var(--brand);background:var(--card);color:var(--ink);font:inherit;cursor:pointer;min-height:40px}
+.opt:hover:not(:disabled){background:var(--ok-bg)}
+.sfoot{display:flex;justify-content:space-between;margin-top:8px}
+.link{border:0;background:none;color:var(--mut);text-decoration:underline;font:inherit;font-size:.85rem;cursor:pointer;min-height:36px}
+.thanks{padding:24px 6px;text-align:center;font-weight:600}
+.chat{display:flex;flex-direction:column;gap:8px;background:var(--chat);border-radius:12px;padding:12px;min-height:240px}
+.chat .qr{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chat .qr.col{flex-direction:column}.chat .qr.list{flex-direction:column}
+.keypad{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.opt.key small{font-size:.75rem;color:var(--mut)}
+.hist,.fu,.qs{margin:6px 0;padding-left:1.1em;font-size:.85rem}
+.fu{list-style:none;padding:0}.fu li{border:1px solid var(--line);border-radius:8px;padding:8px;margin:6px 0}
+#toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%) translateY(120%);background:#222;color:#fff;padding:10px 14px;border-radius:10px;max-width:92vw;font-size:.88rem;transition:transform .2s;z-index:10}
+#toast.show{transform:translateX(-50%) translateY(0)}
+.claims{font-family:ui-monospace,monospace;font-size:.78rem;color:var(--mut)}
+footer{max-width:1100px;margin:0 auto;padding:0 16px 24px;font-size:.8rem;color:var(--mut)}
+</style>
+</head>
+<body>
+<div id="modebar" class="live" role="status"></div>
+<header>
+  <h1>MEL survey simulator</h1>
+  <div>
+    <label class="toggle" style="margin:0"><input type="checkbox" id="modeSwitch"> Replay mode (no API)</label>
+    <button class="btn small" id="resetAll" type="button">Reset all</button>
+  </div>
+</header>
+<main>
+  <section class="card wide" aria-labelledby="hcfg">
+    <h2 id="hcfg">API and sign-in</h2>
+    <form id="signin" autocomplete="off">
+      <div class="grid2">
+        <div><label for="api">API base URL</label><input type="text" id="api" placeholder="https://xxxx.execute-api.us-west-2.amazonaws.com/prod" inputmode="url"></div>
+        <div><label for="pool">Cognito user pool id</label><input type="text" id="pool" placeholder="us-west-2_AbCdEfGhI"></div>
+        <div><label for="client">Cognito app client id</label><input type="text" id="client"></div>
+        <div><label for="user">Username</label><input type="text" id="user" autocapitalize="none"></div>
+        <div><label for="pass">Password (used once, never stored)</label><input type="password" id="pass" autocomplete="new-password"></div>
+        <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap"><button class="btn primary" type="submit" style="margin-top:8px">Sign in</button><span id="signinState" style="padding-bottom:8px"></span></div>
+      </div>
+    </form>
+    <details><summary>Routes (change if the API differs)</summary>
+      <div class="grid2">
+        <div><label for="route-decide">POST decide</label><input type="text" id="route-decide"></div>
+        <div><label for="route-respond">POST response</label><input type="text" id="route-respond"></div>
+        <div><label for="route-events">POST failure, decline, opt-out (not in J's intake yet)</label><input type="text" id="route-events"></div>
+        <div><label for="route-followups">GET follow-ups</label><input type="text" id="route-followups"></div>
+      </div>
+    </details>
+    <p class="muted">The token lives in this page's memory only. Reload the page and it is gone. The farmer id and org id come from the token on the server; this page never sends them in a body field.</p>
+  </section>
+  <div id="status" class="wide" role="alert" hidden></div>
+  <section class="card wide" aria-labelledby="hg"><h2 id="hg">Demo walkthrough</h2><div id="guide"></div></section>
+  <section class="card" aria-labelledby="h1"><h2 id="h1"><span class="n">1</span> Insight and decision</h2><div id="p1"></div></section>
+  <section class="card" aria-labelledby="h2"><h2 id="h2"><span class="n">2</span> Virtual clock</h2><div id="p2"></div></section>
+  <section class="card" aria-labelledby="h3"><h2 id="h3"><span class="n">3</span> Channel view</h2><div id="p3"></div></section>
+  <section class="card" aria-labelledby="h4"><h2 id="h4"><span class="n">4</span> Answers and failures</h2><div id="p4"></div></section>
+  <section class="card wide" aria-labelledby="h5"><h2 id="h5"><span class="n">5</span> Follow-ups</h2><div id="p5"></div></section>
+</main>
+<footer><b>Routes called:</b> <span id="routes"></span></footer>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script id="pack-data" type="application/json">{"scenarios":[{"key":"1-mustard-aphid-spray","title":"mustard aphid spray","insight":{"insight_id":"I-004512","farmer_id":"F-000123","conversation_id":"C-88120","created_at":"2026-12-04T09:12:00+05:30","conversation_language":"hi-IN","location":{"country":"IN","state":"Bihar","district":"Muzaffarpur"},"asset":{"name":"mustard","category":"crop","growth_stage":"flowering"},"concern":"pest_disease","behavioral_intent":"diagnosing","decision_episode_type":"problem_resolution","severity":"medium","query_summary":"Small green insects on mustard flowers and stems.","advice_summary":"These are aphids. Spray the recommended insecticide within 2 days if no rain is forecast. Spray in the evening when bees are not active.","resolution_type":"direct_action","action_window_days":2,"verification":{"needed":true,"timing":"two_to_five_days","method":"push"},"preferred_channel":"app"},"survey":{"survey_id":"S-20931","farmer_id":"F-000123","source_insight_ids":["I-004512"],"language":"en-IN","send_window":{"not_before":"2026-12-06T07:00:00+05:30","not_after":"2026-12-09T19:00:00+05:30"},"items":[{"item_id":"q1","type":"survey-confirm","prompt":"Did you spray your mustard for the aphids (small green insects)?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No"}]},{"item_id":"q2","type":"survey-single-select","prompt":"Was it easy to get the spray?","options":[{"value":"easy","label":"Yes, easily"},{"value":"hard","label":"Yes, with difficulty"},{"value":"not_found","label":"Could not get it","follow_up":"could_not_get_input"}]},{"item_id":"q3","type":"survey-single-select","prompt":"How many of these insects are on the plants now?","options":[{"value":"almost_none","label":"Almost none"},{"value":"fewer","label":"Fewer than before"},{"value":"same","label":"Same as before","follow_up":"advice_did_not_work"},{"value":"more","label":"More than before","follow_up":"advice_did_not_work"}]}],"rationale":"Direct-action pest advice with a 2-day window. Ask from day 2, when the spray is done and the aphid count has had time to change.","self_eval":{"schema_valid":true,"gives_new_advice":false,"asks_personal_info":false}},"handoff":{"handoff_id":"H-20931","created_at":"2026-12-04T23:00:00+05:30","survey":{"survey_id":"S-20931","farmer_id":"F-000123","source_insight_ids":["I-004512"],"language":"en-IN","send_window":{"not_before":"2026-12-06T07:00:00+05:30","not_after":"2026-12-09T19:00:00+05:30"},"items":[{"item_id":"q1","type":"survey-confirm","prompt":"Did you spray your mustard for the aphids (small green insects)?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No"}]},{"item_id":"q2","type":"survey-single-select","prompt":"Was it easy to get the spray?","options":[{"value":"easy","label":"Yes, easily"},{"value":"hard","label":"Yes, with difficulty"},{"value":"not_found","label":"Could not get it","follow_up":"could_not_get_input"}]},{"item_id":"q3","type":"survey-single-select","prompt":"How many of these insects are on the plants now?","options":[{"value":"almost_none","label":"Almost none"},{"value":"fewer","label":"Fewer than before"},{"value":"same","label":"Same as before","follow_up":"advice_did_not_work"},{"value":"more","label":"More than before","follow_up":"advice_did_not_work"}]}],"rationale":"Direct-action pest advice with a 2-day window. Ask from day 2, when the spray is done and the aphid count has had time to change.","self_eval":{"schema_valid":true,"gives_new_advice":false,"asks_personal_info":false}},"send_window":{"not_before":"2026-12-06T07:00:00+05:30","not_after":"2026-12-09T19:00:00+05:30"},"send_hours":{"from":"07:00","to":"19:00"},"channel_order":[{"channel":"app","wait_hours":24},{"channel":"whatsapp","wait_hours":null}],"frequency_cap":{"key":"mel:farmer:F-000123","max_surveys":1,"window_days":7,"exempt":false},"priority":"normal","expires_at":"2026-12-11T19:00:00+05:30","farmerchat_flow":{"org_id":"org.farmerchat","flow_key":"mel_s_20931","version":1,"campaign_id":"283df456-256d-5d97-912f-1a6c4fdde6d0","flow_id":"eb101082-d576-558b-98a6-8f398a0039ae"}}},{"key":"2-wheat-irrigation-timing","title":"wheat irrigation timing","insight":{"insight_id":"I-004871","farmer_id":"F-000187","conversation_id":"C-88402","created_at":"2026-12-08T18:40:00+05:30","conversation_language":"hi-IN","location":{"country":"IN","state":"Bihar","district":"Samastipur"},"asset":{"name":"wheat","category":"crop","growth_stage":"seedling"},"concern":"water_stress","behavioral_intent":"procedural_guidance","decision_episode_type":"decision","severity":"low","query_summary":"When to give the first irrigation to wheat sown on 18 November.","advice_summary":"Give the first irrigation at crown root initiation, 21 to 25 days after sowing, that is between 9 and 13 December. Give a light irrigation and do not flood the field.","resolution_type":"direct_action","action_window_days":5,"verification":{"needed":true,"timing":"three_to_ten_days","method":"whatsapp"},"preferred_channel":"whatsapp"},"survey":{"survey_id":"S-21044","farmer_id":"F-000187","source_insight_ids":["I-004871"],"language":"en-IN","send_window":{"not_before":"2026-12-13T07:00:00+05:30","not_after":"2026-12-18T19:00:00+05:30"},"items":[{"item_id":"q1","type":"survey-single-select","prompt":"Did you give the first irrigation to your wheat?","options":[{"value":"on_time","label":"Yes, on time"},{"value":"late","label":"Yes, but later"},{"value":"not_yet","label":"Not yet"}]},{"item_id":"q2","type":"survey-single-select","prompt":"How does your wheat crop look now?","options":[{"value":"healthy","label":"Green and healthy"},{"value":"some_yellow","label":"Some yellow leaves"},{"value":"many_yellow","label":"Many yellow leaves","follow_up":"crop_or_animal_damaged"}]}],"rationale":"Irrigation timing advice with a 5-day window ending 13 December. Ask after the window closes, while the crop's response is still visible.","self_eval":{"schema_valid":true,"gives_new_advice":false,"asks_personal_info":false}},"handoff":{"handoff_id":"H-21044","created_at":"2026-12-08T23:00:00+05:30","survey":{"survey_id":"S-21044","farmer_id":"F-000187","source_insight_ids":["I-004871"],"language":"en-IN","send_window":{"not_before":"2026-12-13T07:00:00+05:30","not_after":"2026-12-18T19:00:00+05:30"},"items":[{"item_id":"q1","type":"survey-single-select","prompt":"Did you give the first irrigation to your wheat?","options":[{"value":"on_time","label":"Yes, on time"},{"value":"late","label":"Yes, but later"},{"value":"not_yet","label":"Not yet"}]},{"item_id":"q2","type":"survey-single-select","prompt":"How does your wheat crop look now?","options":[{"value":"healthy","label":"Green and healthy"},{"value":"some_yellow","label":"Some yellow leaves"},{"value":"many_yellow","label":"Many yellow leaves","follow_up":"crop_or_animal_damaged"}]}],"rationale":"Irrigation timing advice with a 5-day window ending 13 December. Ask after the window closes, while the crop's response is still visible.","self_eval":{"schema_valid":true,"gives_new_advice":false,"asks_personal_info":false}},"send_window":{"not_before":"2026-12-13T07:00:00+05:30","not_after":"2026-12-18T19:00:00+05:30"},"send_hours":{"from":"07:00","to":"19:00"},"channel_order":[{"channel":"whatsapp","wait_hours":null}],"frequency_cap":{"key":"mel:farmer:F-000187","max_surveys":1,"window_days":7,"exempt":false},"priority":"normal","expires_at":"2026-12-20T19:00:00+05:30","farmerchat_flow":{"org_id":"org.farmerchat","flow_key":"mel_s_21044","version":1,"campaign_id":"283df456-256d-5d97-912f-1a6c4fdde6d0","flow_id":"e720c971-a22e-5d1b-9e70-f6ec8ecb6874"}}},{"key":"3-potato-blight-wait","title":"potato blight wait","insight":{"insight_id":"I-005330","farmer_id":"F-000245","conversation_id":"C-89017","created_at":"2027-01-06T08:05:00+05:30","conversation_language":"hi-IN","location":{"country":"IN","state":"Bihar","district":"Nalanda"},"asset":{"name":"potato","category":"crop","growth_stage":"vegetative"},"concern":"pest_disease","behavioral_intent":"symptom_reporting","decision_episode_type":"problem_resolution","severity":"medium","query_summary":"A few brown spots on lower potato leaves after three foggy days.","advice_summary":"This may be the start of late blight. Do not spray yet. Check the lower leaves every morning for 3 days. If the spots spread or white growth appears under the leaves, send a photo and ask again.","resolution_type":"wait_and_monitor","action_window_days":3,"verification":{"needed":true,"timing":"two_to_five_days","method":"repeat_photo"},"preferred_channel":"web"},"survey":{"survey_id":"S-21310","farmer_id":"F-000245","source_insight_ids":["I-005330"],"language":"en-IN","send_window":{"not_before":"2027-01-09T07:00:00+05:30","not_after":"2027-01-11T19:00:00+05:30"},"items":[{"item_id":"q1","type":"survey-confirm","prompt":"Did you check the potato leaves in the last 3 days?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No"}]},{"item_id":"q2","type":"survey-single-select","prompt":"What is happening to the brown spots?","options":[{"value":"no_new","label":"No new spots"},{"value":"same","label":"Same as before"},{"value":"spreading","label":"Spreading","follow_up":"crop_or_animal_damaged"},{"value":"white_growth","label":"White growth seen","follow_up":"crop_or_animal_damaged"}]},{"item_id":"q3","type":"survey-scale","prompt":"How useful was the advice? 1 means not useful, 5 means very useful.","scale_min":1,"scale_max":5,"follow_up_at_or_below":1,"follow_up_reason":"advice_did_not_work"}],"rationale":"Wait-and-watch disease advice with a 3-day watch. Ask right after the watch ends: a spreading spot needs action within days.","self_eval":{"schema_valid":true,"gives_new_advice":false,"asks_personal_info":false}},"handoff":{"handoff_id":"H-21310","created_at":"2027-01-06T23:00:00+05:30","survey":{"survey_id":"S-21310","farmer_id":"F-000245","source_insight_ids":["I-005330"],"language":"en-IN","send_window":{"not_before":"2027-01-09T07:00:00+05:30","not_after":"2027-01-11T19:00:00+05:30"},"items":[{"item_id":"q1","type":"survey-confirm","prompt":"Did you check the potato leaves in the last 3 days?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No"}]},{"item_id":"q2","type":"survey-single-select","prompt":"What is happening to the brown spots?","options":[{"value":"no_new","label":"No new spots"},{"value":"same","label":"Same as before"},{"value":"spreading","label":"Spreading","follow_up":"crop_or_animal_damaged"},{"value":"white_growth","label":"White growth seen","follow_up":"crop_or_animal_damaged"}]},{"item_id":"q3","type":"survey-scale","prompt":"How useful was the advice? 1 means not useful, 5 means very useful.","scale_min":1,"scale_max":5,"follow_up_at_or_below":1,"follow_up_reason":"advice_did_not_work"}],"rationale":"Wait-and-watch disease advice with a 3-day watch. Ask right after the watch ends: a spreading spot needs action within days.","self_eval":{"schema_valid":true,"gives_new_advice":false,"asks_personal_info":false}},"send_window":{"not_before":"2027-01-09T07:00:00+05:30","not_after":"2027-01-11T19:00:00+05:30"},"send_hours":{"from":"07:00","to":"19:00"},"channel_order":[{"channel":"web","wait_hours":24},{"channel":"app","wait_hours":24},{"channel":"whatsapp","wait_hours":null}],"frequency_cap":{"key":"mel:farmer:F-000245","max_surveys":1,"window_days":7,"exempt":false},"priority":"normal","expires_at":"2027-01-13T19:00:00+05:30","farmerchat_flow":{"org_id":"org.farmerchat","flow_key":"mel_s_21310","version":1,"campaign_id":"283df456-256d-5d97-912f-1a6c4fdde6d0","flow_id":"386347ca-061d-569c-b5c2-6c61403e13c0"}}},{"key":"4-cow-vet-escalation","title":"cow vet escalation","insight":{"insight_id":"I-004990","farmer_id":"F-000311","conversation_id":"C-88655","created_at":"2026-12-15T07:30:00+05:30","conversation_language":"hi-IN","location":{"country":"IN","state":"Bihar","district":"Vaishali"},"asset":{"name":"cow","category":"livestock","growth_stage":null},"concern":"livestock_health","behavioral_intent":"emergency","decision_episode_type":"problem_resolution","severity":"high","query_summary":"Cow has not eaten for two days, has a fever and is breathing fast.","advice_summary":"This needs a vet today. Call the nearest government veterinary hospital or the animal ambulance. Keep the cow in shade with clean water until the vet comes.","resolution_type":"escalate_to_expert","action_window_days":1,"verification":{"needed":true,"timing":"next_day","method":"ivr_callback"},"preferred_channel":"voice"},"survey":{"survey_id":"S-21102","farmer_id":"F-000311","source_insight_ids":["I-004990"],"language":"en-IN","send_window":{"not_before":"2026-12-16T07:00:00+05:30","not_after":"2026-12-18T19:00:00+05:30"},"items":[{"item_id":"q1","type":"survey-confirm","prompt":"Did a vet see your cow?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No","follow_up":"could_not_reach_expert"}]},{"item_id":"q2","type":"survey-single-select","prompt":"How is your cow now?","options":[{"value":"better","label":"Better"},{"value":"same","label":"Same as before","follow_up":"advice_did_not_work"},{"value":"worse","label":"Worse","follow_up":"crop_or_animal_damaged"}]}],"rationale":"Animal emergency sent to a vet. Ask the next morning whether the vet came and how the cow is; a bad answer goes straight to follow-up.","self_eval":{"schema_valid":true,"gives_new_advice":false,"asks_personal_info":false}},"handoff":{"handoff_id":"H-21102","created_at":"2026-12-15T23:00:00+05:30","survey":{"survey_id":"S-21102","farmer_id":"F-000311","source_insight_ids":["I-004990"],"language":"en-IN","send_window":{"not_before":"2026-12-16T07:00:00+05:30","not_after":"2026-12-18T19:00:00+05:30"},"items":[{"item_id":"q1","type":"survey-confirm","prompt":"Did a vet see your cow?","options":[{"value":"yes","label":"Yes"},{"value":"no","label":"No","follow_up":"could_not_reach_expert"}]},{"item_id":"q2","type":"survey-single-select","prompt":"How is your cow now?","options":[{"value":"better","label":"Better"},{"value":"same","label":"Same as before","follow_up":"advice_did_not_work"},{"value":"worse","label":"Worse","follow_up":"crop_or_animal_damaged"}]}],"rationale":"Animal emergency sent to a vet. Ask the next morning whether the vet came and how the cow is; a bad answer goes straight to follow-up.","self_eval":{"schema_valid":true,"gives_new_advice":false,"asks_personal_info":false}},"send_window":{"not_before":"2026-12-16T07:00:00+05:30","not_after":"2026-12-18T19:00:00+05:30"},"send_hours":{"from":"07:00","to":"19:00"},"channel_order":[{"channel":"voice","wait_hours":6},{"channel":"whatsapp","wait_hours":null}],"frequency_cap":{"key":"mel:farmer:F-000311","max_surveys":1,"window_days":7,"exempt":true},"priority":"high","expires_at":"2026-12-20T19:00:00+05:30","farmerchat_flow":{"org_id":"org.farmerchat","flow_key":"mel_s_21102","version":1,"campaign_id":"283df456-256d-5d97-912f-1a6c4fdde6d0","flow_id":"da3324fd-db0f-5d6f-83da-5ee5d9c59b69"}}},{"key":"5-wheat-variety-plan","title":"wheat variety plan","insight":{"insight_id":"I-004420","farmer_id":"F-000402","conversation_id":"C-88010","created_at":"2026-12-02T16:20:00+05:30","conversation_language":"hi-IN","location":{"country":"IN","state":"Bihar","district":"Begusarai"},"asset":{"name":"wheat","category":"crop","growth_stage":null},"concern":"variety_selection","behavioral_intent":"decision_making","decision_episode_type":"decision","severity":"low","query_summary":"Which wheat variety to sow late, after harvesting paddy in mid-December.","advice_summary":"Plan created: for sowing after 15 December, buy certified seed of a heat-tolerant wheat variety recommended for late sowing in Bihar. Sow by 25 December and use a higher seed rate than for timely sowing.","resolution_type":"plan_created","action_window_days":23,"verification":{"needed":true,"timing":"seven_to_fourteen_days","method":"push"},"preferred_channel":"telegram"},"survey":{"survey_id":"S-20877","farmer_id":"F-000402","source_insight_ids":["I-004420"],"language":"en-IN","send_window":{"not_before":"2026-12-25T07:00:00+05:30","not_after":"2026-12-27T19:00:00+05:30"},"items":[{"item_id":"q1","type":"survey-single-select","prompt":"Which wheat seed did you sow?","options":[{"value":"suggested","label":"The suggested type"},{"value":"other","label":"A different type"},{"value":"not_sown","label":"Not sown yet"}]},{"item_id":"q2","type":"survey-scale","prompt":"How easy was it to find good seed? 1 means very hard, 5 means very easy.","scale_min":1,"scale_max":5,"follow_up_at_or_below":1,"follow_up_reason":"could_not_get_input"}],"rationale":"Variety plan with a sowing deadline of 25 December. Asking at 7 to 14 days would land before the sowing date, so the window starts on the deadline.","self_eval":{"schema_valid":true,"gives_new_advice":false,"asks_personal_info":false}},"handoff":{"handoff_id":"H-20877","created_at":"2026-12-02T23:00:00+05:30","survey":{"survey_id":"S-20877","farmer_id":"F-000402","source_insight_ids":["I-004420"],"language":"en-IN","send_window":{"not_before":"2026-12-25T07:00:00+05:30","not_after":"2026-12-27T19:00:00+05:30"},"items":[{"item_id":"q1","type":"survey-single-select","prompt":"Which wheat seed did you sow?","options":[{"value":"suggested","label":"The suggested type"},{"value":"other","label":"A different type"},{"value":"not_sown","label":"Not sown yet"}]},{"item_id":"q2","type":"survey-scale","prompt":"How easy was it to find good seed? 1 means very hard, 5 means very easy.","scale_min":1,"scale_max":5,"follow_up_at_or_below":1,"follow_up_reason":"could_not_get_input"}],"rationale":"Variety plan with a sowing deadline of 25 December. Asking at 7 to 14 days would land before the sowing date, so the window starts on the deadline.","self_eval":{"schema_valid":true,"gives_new_advice":false,"asks_personal_info":false}},"send_window":{"not_before":"2026-12-25T07:00:00+05:30","not_after":"2026-12-27T19:00:00+05:30"},"send_hours":{"from":"07:00","to":"19:00"},"channel_order":[{"channel":"telegram","wait_hours":48},{"channel":"app","wait_hours":48},{"channel":"whatsapp","wait_hours":null}],"frequency_cap":{"key":"mel:farmer:F-000402","max_surveys":1,"window_days":7,"exempt":false},"priority":"low","expires_at":"2026-12-29T19:00:00+05:30","farmerchat_flow":{"org_id":"org.farmerchat","flow_key":"mel_s_20877","version":1,"campaign_id":"283df456-256d-5d97-912f-1a6c4fdde6d0","flow_id":"691d27be-f575-5dbd-8475-b98c90113bcc"}}},{"key":"6-zero-tillage-info-no-survey","title":"zero tillage info no survey","insight":{"insight_id":"I-004101","farmer_id":"F-000519","conversation_id":"C-87790","created_at":"2026-11-20T11:00:00+05:30","conversation_language":"hi-IN","location":{"country":"IN","state":"Bihar","district":"Darbhanga"},"asset":{"name":"wheat","category":"crop","growth_stage":null},"concern":"soil_health","behavioral_intent":"information_seeking","decision_episode_type":"general_knowledge","severity":"low","query_summary":"What is zero tillage and why is it said to be good for wheat?","advice_summary":"Explained zero tillage: sowing wheat with a seed drill straight after paddy, without ploughing, which saves time, diesel and water.","resolution_type":"generic_information","action_window_days":null,"verification":{"needed":false,"timing":"none","method":"none"},"preferred_channel":"app"},"no_survey":{"insight_id":"I-004101","farmer_id":"F-000519","decision":"no_survey","reason_code":"generic_information","reason":"The farmer asked what something means. No action was advised, so there is no advice to check on."}}],"codes":{"window_expired":{"status":"expired","retry_decision":"give_up","retry_after_minutes":null,"counts_toward_cap":true,"channels":["web","whatsapp","telegram","voice"]},"farmer_declined":{"status":"declined","retry_decision":"give_up","retry_after_minutes":null,"counts_toward_cap":true,"channels":["whatsapp","telegram","voice"]},"farmer_opted_out":{"status":"declined","retry_decision":"give_up","retry_after_minutes":null,"counts_toward_cap":true,"channels":["app","web","whatsapp","telegram","voice"]},"push_token_invalid":{"status":"delivery_failed","retry_decision":"fall_back_to_next_channel","retry_after_minutes":0,"counts_toward_cap":false,"channels":["app"]},"client_cannot_render":{"status":"delivery_failed","retry_decision":"fall_back_to_next_channel","retry_after_minutes":0,"counts_toward_cap":false,"channels":["app","web"]},"wa_session_window_closed":{"status":"delivery_failed","retry_decision":"retry_same_channel","retry_after_minutes":0,"counts_toward_cap":false,"channels":["whatsapp"]},"wa_undelivered":{"status":"delivery_failed","retry_decision":"fall_back_to_next_channel","retry_after_minutes":0,"counts_toward_cap":false,"channels":["whatsapp"]},"tg_bot_blocked":{"status":"delivery_failed","retry_decision":"fall_back_to_next_channel","retry_after_minutes":0,"counts_toward_cap":false,"channels":["telegram"]},"voice_no_answer":{"status":"delivery_failed","retry_decision":"fall_back_to_next_channel","retry_after_minutes":0,"counts_toward_cap":false,"channels":["voice"]},"voice_busy":{"status":"delivery_failed","retry_decision":"retry_same_channel","retry_after_minutes":10,"counts_toward_cap":false,"channels":["voice"]},"voice_call_dropped":{"status":"delivery_failed","retry_decision":"retry_same_channel","retry_after_minutes":10,"counts_toward_cap":true,"channels":["voice"]},"free_text_instead_of_choice":{"status":"invalid_input","retry_decision":"retry_same_channel","retry_after_minutes":0,"counts_toward_cap":true,"channels":["whatsapp","telegram"]},"keypad_out_of_range":{"status":"invalid_input","retry_decision":"give_up","retry_after_minutes":null,"counts_toward_cap":true,"channels":["voice"]},"speech_not_understood":{"status":"invalid_input","retry_decision":"give_up","retry_after_minutes":null,"counts_toward_cap":true,"channels":["voice"]},"sheet_dismissed":{"status":"declined","retry_decision":"give_up","retry_after_minutes":null,"counts_toward_cap":true,"channels":["app","web"]},"push_not_opened":{"status":"expired","retry_decision":"give_up","retry_after_minutes":null,"counts_toward_cap":true,"channels":["app"]},"survey_closed":{"status":"stale","retry_decision":"give_up","retry_after_minutes":null,"counts_toward_cap":false,"channels":["app","web","whatsapp","telegram"]},"survey_replaced":{"status":"stale","retry_decision":"give_up","retry_after_minutes":null,"counts_toward_cap":false,"channels":["app","web"]},"duplicate_answer":{"status":"duplicate","retry_decision":"none","retry_after_minutes":null,"counts_toward_cap":false,"channels":["app","web","whatsapp","telegram","voice"]},"identity_mismatch":{"status":"identity_mismatch","retry_decision":"give_up","retry_after_minutes":null,"counts_toward_cap":false,"channels":["app","web","whatsapp","telegram","voice"]}}}</script>
+<script id="core">
+/* ===== CORE: pure functions, no DOM. Needs globals PACK and CODES at call time. ===== */
+const IST_MS = 330 * 60000;
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const SHEET_CHANNELS = ['app', 'web'];
+const OUTBOUND_CHANNELS = ['whatsapp', 'telegram', 'voice'];
+const CHANNELS = ['app', 'web', 'whatsapp', 'telegram', 'voice'];
+
+function pad(n) { return String(n).padStart(2, '0'); }
+/** ms since epoch -> ISO string with +05:30 written out. */
+function fmt(ms) {
+  const d = new Date(ms + IST_MS);
+  return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()) + 'T' +
+    pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds()) + '+05:30';
+}
+function parseT(s) { return Date.parse(s); }
+function fmtShort(ms) {
+  const d = new Date(ms + IST_MS);
+  return DAYS[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear() +
+    ', ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' IST';
+}
+function istMinutes(ms) { const d = new Date(ms + IST_MS); return d.getUTCHours() * 60 + d.getUTCMinutes(); }
+function hhmm(s) { const p = s.split(':').map(Number); return p[0] * 60 + p[1]; }
+
+const STR = {
+  'en-IN': {
+    title: 'A quick question about the advice you got',
+    skip: 'Skip', close: 'Close',
+    thanks: 'Thank you. Your answers help us give better advice.',
+    waBody: 'A short question from FarmerChat about the advice you got. It takes one minute.',
+    waStart: 'Start', waLater: 'Not now',
+    listButton: 'Choose', listTitle: 'Choose one',
+    tgIntro: 'A short question from FarmerChat about the advice you got. It takes one minute.',
+    voiceOpen: function (n) {
+      const w = { 1: 'one short question', 2: 'two short questions', 3: 'three short questions' }[n];
+      return 'Hello, this is a call from FarmerChat. We have ' + w + ' about the advice you got. You can press a key or say your answer.';
+    },
+    voiceFollowUp: 'Thank you. We have noted this. FarmerChat will contact you again about it.',
+    forPress: function (label, k) { return 'For ' + label + ', press ' + k + '.'; },
+    scalePress: function (a, b) { return 'Press or say a number from ' + a + ' to ' + b + '.'; },
+  },
+};
+const NUMW = { 0: 'zero', 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten' };
+
+function optionList(item) {
+  if (item.type === 'survey-scale') {
+    const a = [];
+    for (let v = item.scale_min; v <= item.scale_max; v++) a.push({ value: v, label: String(v) });
+    return a;
+  }
+  return item.options.map(function (o) { return { value: o.value, label: o.label }; });
+}
+/** WhatsApp shows up to 3 choices as reply buttons, more as a list. Scales are lists. */
+function waKind(item) {
+  return item.type !== 'survey-scale' && optionList(item).length <= 3 ? 'button' : 'list';
+}
+
+function renderSheet(survey, channel) {
+  const S = STR[survey.language] || STR['en-IN'];
+  const n = survey.items.length;
+  return {
+    channel: channel,
+    presentation: {
+      type: 'bottom_sheet',
+      opens_when: channel === 'app' ? ['push_tapped', 'next_app_open'] : ['next_web_visit'],
+      waits_for: ['answer_finished_streaming', 'no_typing_for_5_seconds', 'no_call_in_progress'],
+      one_question_per_step: true, steps_total: n, can_skip: true, can_close: true, swipe_down_closes: true,
+    },
+    sheet: {
+      title: S.title, skip_label: S.skip, close_label: S.close, thank_you: S.thanks,
+      steps: survey.items.map(function (it, i) {
+        return {
+          step: i + 1, step_label: (i + 1) + ' of ' + n, item_id: it.item_id, question_type: it.type, question: it.prompt,
+          options: optionList(it).map(function (o) { return { label: o.label, answer: o.value }; }),
+        };
+      }),
+    },
+  };
+}
+
+function renderWhatsApp(survey) {
+  const S = STR[survey.language] || STR['en-IN'];
+  const sid = survey.survey_id;
+  const to = '<farmer WhatsApp number>';
+  return {
+    channel: 'whatsapp',
+    opening_template: {
+      messaging_product: 'whatsapp', to: to, type: 'template',
+      template: {
+        name: 'mel_survey_invite', language: { code: 'en' },
+        components: [
+          { type: 'button', sub_type: 'quick_reply', index: '0', parameters: [{ type: 'payload', payload: sid + '|start' }] },
+          { type: 'button', sub_type: 'quick_reply', index: '1', parameters: [{ type: 'payload', payload: sid + '|later' }] },
+        ],
+      },
+    },
+    template_text_for_approval: { body: S.waBody, quick_replies: [S.waStart, S.waLater] },
+    messages: survey.items.map(function (it) {
+      const opts = optionList(it);
+      if (waKind(it) === 'button') {
+        return {
+          messaging_product: 'whatsapp', to: to, type: 'interactive',
+          interactive: {
+            type: 'button', body: { text: it.prompt },
+            action: { buttons: opts.map(function (o) { return { type: 'reply', reply: { id: sid + '|' + it.item_id + '|' + o.value, title: o.label } }; }) },
+          },
+        };
+      }
+      return {
+        messaging_product: 'whatsapp', to: to, type: 'interactive',
+        interactive: {
+          type: 'list', body: { text: it.prompt },
+          action: {
+            button: S.listButton,
+            sections: [{ title: S.listTitle, rows: opts.map(function (o) { return { id: sid + '|' + it.item_id + '|' + o.value, title: o.label }; }) }],
+          },
+        },
+      };
+    }),
+  };
+}
+
+function renderTelegram(survey) {
+  const S = STR[survey.language] || STR['en-IN'];
+  const sid = survey.survey_id;
+  const chat = '<telegram chat id>';
+  const msgs = [{ method: 'sendMessage', chat_id: chat, text: S.tgIntro }];
+  survey.items.forEach(function (it) {
+    const btns = optionList(it).map(function (o) { return { text: o.label, callback_data: 'mel|' + sid + '|' + it.item_id + '|' + o.value }; });
+    msgs.push({
+      method: 'sendMessage', chat_id: chat, text: it.prompt,
+      reply_markup: { inline_keyboard: it.type === 'survey-scale' ? [btns] : btns.map(function (b) { return [b]; }) },
+    });
+  });
+  return { channel: 'telegram', messages: msgs };
+}
+
+function renderVoice(survey) {
+  const S = STR[survey.language] || STR['en-IN'];
+  return {
+    channel: 'voice',
+    opening: S.voiceOpen(survey.items.length),
+    items: survey.items.map(function (it) {
+      const opts = optionList(it);
+      const keypad = {};
+      const speech = {};
+      let say;
+      if (it.type === 'survey-scale') {
+        opts.forEach(function (o) { keypad[String(o.value)] = o.value; speech[String(o.value)] = [String(o.value), NUMW[o.value] || String(o.value)]; });
+        say = it.prompt + ' ' + S.scalePress(it.scale_min, it.scale_max);
+      } else {
+        opts.forEach(function (o, i) { keypad[String(i + 1)] = o.value; speech[o.value] = [o.label]; });
+        say = it.prompt + ' ' + opts.map(function (o, i) { return S.forPress(o.label, i + 1); }).join(' ');
+      }
+      return { item_id: it.item_id, say: say, keypad: keypad, speech: speech, timeout_seconds: 8, repeat_if_no_input: 1 };
+    }),
+    closing: S.thanks,
+    closing_if_follow_up: S.voiceFollowUp,
+  };
+}
+
+/** Raw input and input kind for one tap, shaped like the pack response fixtures. */
+function rawFor(survey, channel, item, optIndex, value) {
+  const sid = survey.survey_id;
+  if (channel === 'app' || channel === 'web') return { raw: String(value), kind: 'sheet_tap' };
+  if (channel === 'whatsapp') return { raw: sid + '|' + item.item_id + '|' + value, kind: waKind(item) === 'button' ? 'button_reply' : 'list_reply' };
+  if (channel === 'telegram') return { raw: 'mel|' + sid + '|' + item.item_id + '|' + value, kind: 'callback_data' };
+  return { raw: item.type === 'survey-scale' ? String(value) : String(optIndex + 1), kind: 'keypad' };
+}
+
+/** Follow-up reasons for accepted answers, in item order, no repeats. */
+function followUpReasons(survey, answers) {
+  const out = [];
+  survey.items.forEach(function (it) {
+    if (!(it.item_id in answers)) return;
+    const v = answers[it.item_id];
+    let r = null;
+    if (it.type === 'survey-scale') {
+      if (it.follow_up_at_or_below != null && v <= it.follow_up_at_or_below) r = it.follow_up_reason;
+    } else {
+      const o = it.options.find(function (x) { return x.value === v; });
+      if (o && o.follow_up) r = o.follow_up;
+    }
+    if (r && out.indexOf(r) < 0) out.push(r);
+  });
+  return out;
+}
+
+const RAW_EVENTS = {
+  push_token_invalid: 'push service: UNREGISTERED',
+  client_cannot_render: 'this version cannot show the survey sheet',
+  farmer_opted_out: 'tapped Do not ask me again in the sheet',
+  sheet_dismissed: 'sheet swiped down',
+  farmer_declined: 'quick reply: later',
+};
+
+/**
+ * Replay only: build a ResponseRecord locally, using the embedded outcome_codes table.
+ * o: {survey, channel, failure_code, answers, raw_inputs, input_kinds, stop_index, skipped, sheet_outcome,
+ *     response_key, now, window_start, attempt, duplicate}
+ */
+function buildRecord(o) {
+  const sv = o.survey;
+  const code = o.failure_code || null;
+  const info = code ? CODES[code] : null;
+  const isSheet = SHEET_CHANNELS.indexOf(o.channel) >= 0;
+  const dup = code === 'duplicate_answer';
+  const arrived = o.answers || {};
+  const keepsAnswers = !code || code === 'voice_call_dropped';
+  const accepted = keepsAnswers ? Object.assign({}, arrived) : {};
+  const noDelivery = !!info && info.status === 'delivery_failed' && code !== 'voice_call_dropped';
+  const lastAnswered = sv.items.reduce(function (m, it, i) { return it.item_id in accepted ? i : m; }, -1);
+  const skipped = o.skipped || [];
+  const items = sv.items.map(function (it, i) {
+    const base = { item_id: it.item_id, item_type: it.type, result: 'not_reached', value: null, raw_input: null, input_kind: null, attempts: 0 };
+    const raw = (o.raw_inputs || {})[it.item_id];
+    const kind = (o.input_kinds || {})[it.item_id] || 'sheet_tap';
+    if (it.item_id in accepted) {
+      base.result = 'answered'; base.value = accepted[it.item_id];
+      base.raw_input = raw || String(base.value); base.input_kind = kind; base.attempts = 1;
+    } else if (dup && it.item_id in arrived) {
+      base.result = 'discarded'; base.value = arrived[it.item_id];
+      base.raw_input = raw || String(base.value); base.input_kind = kind; base.attempts = 1;
+    } else if (!dup && !noDelivery && (skipped.indexOf(it.item_id) >= 0 || i === o.stop_index || i < lastAnswered)) {
+      base.result = 'skipped'; base.attempts = 1;
+    }
+    return base;
+  });
+  const reasons = code ? [] : followUpReasons(sv, accepted);
+  const complete = !code && items.every(function (x) { return x.result === 'answered'; });
+  let status, retry = 'none', retryAfter = null, cap = true, reply = null;
+  if (info) {
+    status = info.status; retry = info.retry_decision; retryAfter = info.retry_after_minutes; cap = info.counts_toward_cap;
+    if (dup) reply = { http_status: 200, outcome: 'duplicate' };
+  } else {
+    status = reasons.length ? 'negative_outcome' : (complete ? 'completed' : 'partial');
+    reply = { http_status: 201, outcome: 'accepted' };
+  }
+  const sentMs = o.window_start != null ? Math.min(o.window_start, o.now) : o.now;
+  const deliveredMs = Math.min(sentMs + 60000, o.now);
+  const t = {
+    sent: fmt(sentMs),
+    delivered: noDelivery ? null : fmt(deliveredMs),
+    opened: noDelivery || o.channel === 'telegram' ? null : fmt(Math.max(deliveredMs, o.now - 300000)),
+    answered: noDelivery ? null : fmt(o.now),
+  };
+  return {
+    response_key: o.response_key,
+    survey_id: sv.survey_id,
+    farmer_id: sv.farmer_id,
+    source_insight_ids: sv.source_insight_ids.slice(),
+    channel: o.channel,
+    language: sv.language,
+    status: status,
+    failure_code: code,
+    sheet_outcome: isSheet ? (o.sheet_outcome || null) : null,
+    answers: accepted,
+    items: items,
+    complete: complete,
+    delivery_attempt: o.attempt || 1,
+    timestamps: t,
+    recorded_at: fmt(o.now),
+    answered_by: noDelivery ? null : sv.farmer_id,
+    raw_event: code ? (RAW_EVENTS[code] || null) : null,
+    retry_decision: retry,
+    retry_after_minutes: retryAfter,
+    counts_toward_cap: cap,
+    farmerchat_reply: reply,
+    needs_follow_up: reasons.length > 0,
+    follow_up_reasons: reasons,
+  };
+}
+
+/** Accept the several shapes the decide route might return. */
+function normalizeDecide(body) {
+  body = body || {};
+  let d = null;
+  if (body.decision && typeof body.decision === 'object') d = body.decision;
+  else if (body.decision_record) d = body.decision_record;
+  else if (body.rule_id) d = body;
+  const handoff = body.handoff || body.schedule_handoff || null;
+  const survey = body.survey && typeof body.survey === 'object' ? body.survey : (handoff && handoff.survey) || null;
+  const noSurvey = body.no_survey || (body.decision === 'no_survey' ? body : null);
+  let suppressed = body.suppressed || null;
+  if (!suppressed && (body.status === 'suppressed' || body.error === 'farmer_opted_out' || body.code === 'farmer_opted_out')) {
+    suppressed = { reason: 'farmer_opted_out' };
+  }
+  if (suppressed === true) suppressed = { reason: 'farmer_opted_out' };
+  const status = typeof body.status === 'string' ? body.status : null;
+  if (!suppressed && status === 'opted_out') suppressed = { reason: 'farmer_opted_out' };
+  // run_decision statuses: survey_scheduled, no_survey, timing_exception, opted_out, failed_review, pending_review
+  const notSent = status && ['timing_exception', 'failed_review', 'pending_review'].indexOf(status) >= 0 ? status : null;
+  return { decision: d, survey: survey, handoff: handoff, noSurvey: noSurvey, suppressed: suppressed, status: status, notSent: notSent,
+    reasons: Array.isArray(body.reasons) ? body.reasons : [] };
+}
+
+/** Is the survey reachable on this channel at this virtual time? */
+function gateFor(ctx) {
+  const d = ctx.decided;
+  if (!d) return { open: false, reason: 'No decision yet. Pick a scenario and tap Decide.' };
+  if (d.suppressed) return { open: false, reason: 'Suppressed: the farmer opted out. No survey is sent.' };
+  if (d.notSent) return { open: false, reason: 'Nothing is sent: decision status is ' + d.notSent + '.' };
+  if (!d.survey) return { open: false, reason: 'Decision: no survey. Nothing is sent.' };
+  const w = d.survey.send_window;
+  const t = ctx.clock;
+  if (t < parseT(w.not_before)) return { open: false, reason: 'Window opens ' + fmtShort(parseT(w.not_before)) + '. Advance the clock.', early: true };
+  if (t > parseT(w.not_after)) return { open: false, reason: 'Window closed ' + fmtShort(parseT(w.not_after)) + '. The survey expired.', expired: true };
+  if (OUTBOUND_CHANNELS.indexOf(ctx.channel) >= 0) {
+    const sh = (d.handoff && d.handoff.send_hours) || { from: '07:00', to: '19:00' };
+    const m = istMinutes(t);
+    if (m < hhmm(sh.from) || m >= hhmm(sh.to)) return { open: false, reason: 'Outside send hours ' + sh.from + ' to ' + sh.to + ' IST. Advance the clock.' };
+  } else if (!ctx.idle) {
+    return { open: false, reason: 'Chat is not idle. The sheet waits for the answer to finish, 5 s without typing, and no call.' };
+  }
+  return { open: true };
+}
+
+function nextChannel(handoff, current) {
+  const order = ((handoff && handoff.channel_order) || []).map(function (c) { return c.channel; });
+  const i = order.indexOf(current);
+  return i >= 0 && i + 1 < order.length ? order[i + 1] : null;
+}
+
+</script>
+<script id="ui">
+/* ===== UI: DOM, state, API calls. All dynamic text goes in with textContent. ===== */
+const PACK = JSON.parse(document.getElementById('pack-data').textContent);
+const CODES = PACK.codes;
+
+const DEFAULT_ROUTES = { decide: '/surveys/decide', respond: '/surveys/{survey_id}/responses', events: '/surveys/{survey_id}/events', followups: '/follow-ups' };
+const STEP5 = [
+  ['pushfail', 'push_token_invalid, falls back'],
+  ['partial', 'closed partway, partial'],
+  ['dup', 'duplicate rejected'],
+  ['optout', 'opt-out recorded'],
+  ['suppressed', 'next survey suppressed'],
+];
+
+const state = {
+  mode: 'live',
+  token: null,
+  claims: null,
+  scenarioIdx: 2,
+  decided: null,
+  clock: parseT(PACK.scenarios[2].insight.created_at),
+  idle: true,
+  channel: 'web',
+  run: null,
+  attempt: 1,
+  lastPayload: null,
+  lastRecord: null,
+  history: [],
+  followUps: [],
+  optedOut: false,
+  seenKeys: {},
+  answeredSurveys: {},
+  flags: {},
+  routes: {},
+  error: null,
+  busy: false,
+  toast: '',
+};
+state.run = newRun();
+
+function newRun() { return { answers: {}, rawInputs: {}, inputKinds: {}, skipped: [], idx: 0, waStarted: false, done: false }; }
+function sc() { return PACK.scenarios[state.scenarioIdx]; }
+function survey() { return state.decided && state.decided.survey; }
+function isSheet(ch) { return SHEET_CHANNELS.indexOf(ch) >= 0; }
+function windowStartMs() { const s = survey(); return s ? parseT(s.send_window.not_before) : null; }
+
+function h(tag, props) {
+  const e = document.createElement(tag);
+  const p = props || {};
+  Object.keys(p).forEach(function (k) {
+    const v = p[k];
+    if (k === 'class') e.className = v;
+    else if (k.indexOf('on') === 0) e.addEventListener(k.slice(2), v);
+    else if (k === 'disabled' || k === 'checked' || k === 'hidden') e[k] = !!v;
+    else if (v != null) e.setAttribute(k, v);
+  });
+  for (let i = 2; i < arguments.length; i++) {
+    const kids = [].concat(arguments[i]);
+    kids.forEach(function (c) {
+      if (c == null || c === false) return;
+      e.append(c.nodeType ? c : document.createTextNode(String(c)));
+    });
+  }
+  return e;
+}
+/** append that skips null and false (Node.append would write the text "null"). */
+function add(parent) {
+  for (let i = 1; i < arguments.length; i++) { const c = arguments[i]; if (c != null && c !== false) parent.append(c); }
+}
+function $(s) { return document.querySelector(s); }
+function mount(sel, node) { const t = $(sel); t.replaceChildren(node); }
+function chip(text, cls) { return h('span', { class: 'chip ' + (cls || '') }, text); }
+function kv(k, v) { return h('div', { class: 'kv' }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v == null ? 'null' : String(v))); }
+function pre(obj) { return h('pre', { class: 'json' }, JSON.stringify(obj, null, 2)); }
+function say(msg) {
+  state.toast = msg;
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(say._t); say._t = setTimeout(function () { t.classList.remove('show'); }, 3500);
+}
+
+/* ---------- API ---------- */
+function routeTemplate(key) {
+  const input = document.getElementById('route-' + key);
+  return (input && input.value.trim()) || DEFAULT_ROUTES[key];
+}
+function routeFor(key, vars) {
+  let p = routeTemplate(key);
+  Object.keys(vars || {}).forEach(function (k) { p = p.replace('{' + k + '}', encodeURIComponent(vars[k])); });
+  return p;
+}
+async function api(method, key, vars, body) {
+  const base = document.getElementById('api').value.trim().replace(/\/+$/, '');
+  if (!base) throw new Error('Set the API base URL first.');
+  if (!state.token) throw new Error('Sign in first (Cognito).');
+  const path = routeFor(key, vars);
+  const sig = method + ' ' + routeTemplate(key);
+  state.routes[sig] = (state.routes[sig] || 0) + 1;
+  let res;
+  try {
+    res = await fetch(base + path, {
+      method: method,
+      headers: Object.assign({ Authorization: 'Bearer ' + state.token }, body ? { 'Content-Type': 'application/json' } : {}),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    const err = new Error('API unreachable: ' + (e && e.message ? e.message : 'network error'));
+    err.network = true;
+    throw err;
+  }
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  return { status: res.status, ok: res.ok, body: data };
+}
+function describeError(r) {
+  const b = r.body || {};
+  return 'HTTP ' + r.status + (b.code || b.error || b.message ? ': ' + [b.code, b.error, b.message].filter(function (x) { return typeof x === 'string'; }).join(' / ') : '');
+}
+function setError(where, e) {
+  state.error = { where: where, msg: e.message || String(e), network: !!e.network };
+  renderStatus();
+}
+function clearError() { state.error = null; renderStatus(); }
+
+/* ---------- Cognito ---------- */
+function decodeClaims(jwt) {
+  try {
+    const part = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(atob(part).split('').map(function (c) { return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join(''));
+    return JSON.parse(json);
+  } catch (e) { return null; }
+}
+async function signIn() {
+  const pool = $('#pool').value.trim();
+  const client = $('#client').value.trim();
+  const user = $('#user').value.trim();
+  const passEl = $('#pass');
+  const pass = passEl.value;
+  passEl.value = '';
+  if (!pool || !client || !user || !pass) { say('Fill in pool id, client id, username and password.'); return; }
+  const region = pool.split('_')[0];
+  try {
+    const res = await fetch('https://cognito-idp.' + region + '.amazonaws.com/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-amz-json-1.1', 'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth' },
+      body: JSON.stringify({ AuthFlow: 'USER_PASSWORD_AUTH', ClientId: client, AuthParameters: { USERNAME: user, PASSWORD: pass } }),
+    });
+    const data = await res.json();
+    if (!res.ok) { throw new Error('Sign-in failed: ' + (data.__type || res.status)); }
+    if (data.ChallengeName) { throw new Error('Cognito asks for ' + data.ChallengeName + '. Set a permanent password first.'); }
+    state.token = data.AuthenticationResult.IdToken;
+    state.claims = decodeClaims(state.token);
+    clearError();
+    say('Signed in.');
+  } catch (e) {
+    state.token = null; state.claims = null;
+    if (e instanceof TypeError) { e = new Error('Cognito unreachable: ' + e.message); e.network = true; }
+    setError('Cognito', e);
+  }
+  renderConfig();
+}
+function signOut() { state.token = null; state.claims = null; renderConfig(); }
+
+/* ---------- Scenario, decide ---------- */
+function setScenario(i) {
+  state.scenarioIdx = i;
+  state.decided = null;
+  state.clock = parseT(PACK.scenarios[i].insight.created_at);
+  state.run = newRun();
+  state.attempt = 1;
+  state.lastPayload = null;
+  state.lastRecord = null;
+  state.history = [];
+  clearError();
+  renderAll();
+}
+
+function replayDecide() {
+  const s = sc();
+  const ins = s.insight;
+  const base = { insight_id: ins.insight_id, farmer_id: ins.farmer_id, timing_profile: 'rules_v1', created_at: fmt(state.clock) };
+  if (!s.survey) {
+    return {
+      decision: Object.assign({}, base, { survey: false, rule_id: 'R3', reason_code: 'nothing_to_verify', send_window: null }),
+      status: 'no_survey', survey: null, handoff: null, noSurvey: s.no_survey, suppressed: null,
+    };
+  }
+  return {
+    decision: Object.assign({}, base, { survey: true, rule_id: 'R8', reason_code: null, send_window: s.survey.send_window }),
+    status: state.optedOut ? 'opted_out' : 'survey_scheduled', survey: s.survey, handoff: s.handoff, noSurvey: null,
+    suppressed: state.optedOut ? { reason: 'farmer_opted_out' } : null,
+  };
+}
+
+async function doDecide() {
+  if (state.busy) return;
+  clearError();
+  state.busy = true; renderPanel1();
+  try {
+    let out;
+    if (state.mode === 'replay') {
+      out = replayDecide();
+      if (out.survey) { delete state.answeredSurveys[out.survey.survey_id]; Object.keys(state.seenKeys).forEach(function (k) { if (k.indexOf('rk-' + out.survey.survey_id + '-') === 0) delete state.seenKeys[k]; }); }
+    } else {
+      // The server needs insight.farmer_id == the JWT farmer (else 403 identity_mismatch). Use the token's farmer for the demo.
+      const body = JSON.parse(JSON.stringify(sc().insight));
+      if (state.claims && state.claims['custom:farmer_id']) body.farmer_id = state.claims['custom:farmer_id'];
+      const r = await api('POST', 'decide', {}, body);
+      if (r.status === 403 || r.status === 409) {
+        const n = normalizeDecide(r.body);
+        if (n.suppressed) { out = n; }
+      }
+      if (!out) {
+        if (!r.ok) throw new Error(describeError(r));
+        out = normalizeDecide(r.body);
+        if (!out.decision) throw new Error('The decide response had no decision record.');
+        if (out.decision.survey && !out.survey && !out.notSent && !out.suppressed) throw new Error('Decision says survey, but the response carries no survey.');
+      }
+    }
+    state.decided = out;
+    state.run = newRun(); state.attempt = 1; state.lastPayload = null; state.lastRecord = null; state.history = [];
+    if (out.decision && out.decision.survey) {
+      const first = out.handoff && out.handoff.channel_order && out.handoff.channel_order[0];
+      state.channel = first ? first.channel : sc().insight.preferred_channel || 'web';
+    }
+    if (out.suppressed) state.flags.suppressed = true;
+    if (out.decision && out.decision.survey && !out.suppressed && state.scenarioIdx === 2) state.flags.decided3 = true;
+    if (out.decision && !out.decision.survey && state.scenarioIdx === 5) state.flags.decided6 = true;
+  } catch (e) {
+    setError('Decide', e);
+  }
+  state.busy = false;
+  renderAll();
+}
+
+/* ---------- Responses ---------- */
+function stopIndexFor() { return Math.min(state.run.idx, (survey() ? survey().items.length : 1) - 1); }
+
+function buildPayload(kind, extra) {
+  const sv = survey();
+  const run = state.run;
+  const key = 'rk-' + sv.survey_id + '-' + state.channel + '-a' + state.attempt + (extra && extra.keySuffix ? '-' + extra.keySuffix : '');
+  const p = {
+    response_key: key,
+    channel: state.channel,
+    kind: kind,
+    failure_code: (extra && extra.failure_code) || null,
+    answers: (extra && extra.noAnswers) ? {} : Object.assign({}, run.answers),
+    raw_inputs: (extra && extra.noAnswers) ? {} : Object.assign({}, run.rawInputs),
+    input_kinds: (extra && extra.noAnswers) ? {} : Object.assign({}, run.inputKinds),
+    sheet_outcome: isSheet(state.channel) ? ((extra && extra.sheet_outcome) || null) : null,
+    delivery_attempt: state.attempt,
+    at: fmt(state.clock),
+  };
+  return p;
+}
+
+async function sendResponse(payload, meta) {
+  if (state.busy) return null;
+  clearError();
+  state.busy = true; renderAll();
+  let rec = null;
+  try {
+    if (state.mode === 'replay') {
+      const dup = !!state.seenKeys[payload.response_key] || (payload.kind === 'answer' && !!state.answeredSurveys[survey().survey_id]);
+      const sv = survey();
+      const code = dup ? 'duplicate_answer' : payload.failure_code;
+      rec = buildRecord({
+        survey: sv, channel: payload.channel, failure_code: code, answers: payload.answers, raw_inputs: payload.raw_inputs,
+        input_kinds: payload.input_kinds, sheet_outcome: dup ? 'finished' : payload.sheet_outcome, response_key: payload.response_key + (dup ? '-dup' : ''),
+        now: state.clock, window_start: windowStartMs(), attempt: payload.delivery_attempt,
+        stop_index: meta && meta.stop_index, skipped: meta && meta.skipped,
+      });
+      state.seenKeys[payload.response_key] = true;
+      if (['completed', 'partial', 'negative_outcome'].indexOf(rec.status) >= 0) state.answeredSurveys[survey().survey_id] = true;
+    } else {
+      const isAnswer = payload.kind === 'answer';
+      const r = await api('POST', isAnswer ? 'respond' : 'events', { survey_id: survey().survey_id }, wirePayload(payload));
+      if (!isAnswer && (r.status === 404 || r.status === 405) && !(r.body && r.body.error)) {
+        throw new Error('This API has no route for failures, declines or opt-outs (' + routeTemplate('events') + '). Intake only takes answers. See NOTES-L.md.');
+      }
+      if (!r.ok && !(r.body && r.body.status)) throw new Error(describeError(r));
+      rec = (r.body && r.body.response) || r.body;
+      if (!rec || !rec.status) throw new Error('The response route returned no status. ' + describeError(r));
+    }
+  } catch (e) {
+    state.busy = false;
+    setError('Response', e);
+    renderAll();
+    return null;
+  }
+  state.busy = false;
+  afterRecord(payload, rec, meta);
+  renderAll();
+  if (rec.needs_follow_up || rec.status === 'negative_outcome') await refreshFollowUps(true);
+  return rec;
+}
+
+/**
+ * Body for the live API. intake.ResponsePayload forbids every other key, so identity and extras are never sent.
+ * Answers go to the response route. Failures, declines and opt-outs have no intake route yet (see NOTES-L.md),
+ * so they go to the events route with kind and failure_code.
+ */
+function wirePayload(p) {
+  const w = { response_key: p.response_key, channel: p.channel, delivery_attempt: p.delivery_attempt };
+  if (p.sheet_outcome) w.sheet_outcome = p.sheet_outcome;
+  if (p.kind === 'answer') {
+    w.answers = p.answers;
+    const kinds = Object.keys(p.input_kinds || {}).map(function (k) { return p.input_kinds[k]; });
+    if (kinds.length) w.input_kind = kinds[kinds.length - 1];
+  } else {
+    w.kind = p.kind;
+    w.failure_code = p.failure_code;
+  }
+  return w;
+}
+
+function afterRecord(payload, rec, meta) {
+  state.lastRecord = rec;
+  state.history.unshift({ at: state.clock, status: rec.status, code: rec.failure_code, channel: rec.channel });
+  if (rec.status !== 'duplicate') state.lastPayload = payload;
+  const f = state.flags;
+  if (rec.status === 'duplicate') f.dup = true;
+  if (rec.status === 'partial') f.partial = true;
+  if (rec.failure_code === 'push_token_invalid') f.pushfail = true;
+  if (rec.failure_code === 'farmer_opted_out') { f.optout = true; state.optedOut = true; }
+  const final = ['completed', 'partial', 'negative_outcome', 'declined', 'expired'].indexOf(rec.status) >= 0;
+  if (final) state.run.done = true;
+  if (rec.retry_decision === 'fall_back_to_next_channel') {
+    const nx = nextChannel(state.decided.handoff, rec.channel);
+    if (nx) {
+      state.channel = nx; state.run = newRun(); state.attempt = (rec.delivery_attempt || state.attempt) + 1;
+      say('Delivery failed on ' + rec.channel + '. Falling back to ' + nx + '.');
+    } else {
+      say('Delivery failed on ' + rec.channel + '. No next channel in the hand-off.');
+    }
+  }
+}
+
+function guardOpen(allowDone) {
+  const g = gateFor({ decided: state.decided, clock: state.clock, idle: state.idle, channel: state.channel });
+  if (!g.open) { say(g.reason); return false; }
+  if (state.run.done && !allowDone) { say('This attempt is finished. Use Duplicate submit, Opt out, or Decide again.'); return false; }
+  return true;
+}
+
+function tap(item, opt, optIndex) {
+  if (!guardOpen()) return;
+  const run = state.run;
+  const sv = survey();
+  const r = rawFor(sv, state.channel, item, optIndex, opt.value);
+  run.answers[item.item_id] = opt.value;
+  run.rawInputs[item.item_id] = r.raw;
+  run.inputKinds[item.item_id] = r.kind;
+  run.idx += 1;
+  if (run.idx >= sv.items.length) finish(); else renderAll();
+}
+function skipItem() {
+  if (!guardOpen()) return;
+  const run = state.run;
+  const sv = survey();
+  run.skipped.push(sv.items[run.idx].item_id);
+  run.idx += 1;
+  if (run.idx >= sv.items.length) finish(); else renderAll();
+}
+function finish() {
+  const run = state.run;
+  if (Object.keys(run.answers).length === 0) {
+    return sendResponse(buildPayload('failure', { failure_code: 'sheet_dismissed', sheet_outcome: 'dismissed', noAnswers: true }), { stop_index: 0 });
+  }
+  return sendResponse(buildPayload('answer', { sheet_outcome: isSheet(state.channel) ? 'finished' : null }), { skipped: run.skipped.slice() });
+}
+function closePartway() {
+  if (!guardOpen()) return;
+  const run = state.run;
+  const n = Object.keys(run.answers).length;
+  if (isSheet(state.channel)) {
+    if (n === 0) return sendResponse(buildPayload('failure', { failure_code: 'sheet_dismissed', sheet_outcome: 'dismissed', noAnswers: true }), { stop_index: stopIndexFor() });
+    return sendResponse(buildPayload('answer', { sheet_outcome: 'closed_partway' }), { stop_index: stopIndexFor(), skipped: run.skipped.slice() });
+  }
+  if (n === 0) { say('Answer at least one question first, then stop.'); return; }
+  return sendResponse(buildPayload('answer', {}), { stop_index: stopIndexFor(), skipped: run.skipped.slice() });
+}
+function simFailure(code) {
+  if (!guardOpen()) return;
+  const info = CODES[code];
+  if (info.channels.indexOf(state.channel) < 0) { say(code + ' applies to ' + info.channels.join(', ') + ' only. Open that tab.'); return; }
+  return sendResponse(buildPayload('failure', { failure_code: code, sheet_outcome: isSheet(state.channel) ? 'never_opened' : null, noAnswers: true }), {});
+}
+function dupSubmit() {
+  if (!state.lastPayload) { say('Nothing sent yet. Finish an attempt first.'); return; }
+  return sendResponse(Object.assign({}, state.lastPayload), {});
+}
+function optOut() {
+  if (!state.decided || !survey()) { say('Decide on a survey first.'); return; }
+  if (state.decided.suppressed) { say('Already opted out.'); return; }
+  const g = gateFor({ decided: state.decided, clock: state.clock, idle: true, channel: state.channel });
+  if (!g.open) { say(g.reason); return; }
+  return sendResponse(buildPayload('opt_out', { failure_code: 'farmer_opted_out', sheet_outcome: isSheet(state.channel) ? 'dismissed' : null, noAnswers: true, keySuffix: 'optout' }), {});
+}
+function declineLater() {
+  if (!guardOpen()) return;
+  return sendResponse(buildPayload('decline', { failure_code: 'farmer_declined', noAnswers: true, keySuffix: 'later' }), {});
+}
+
+/* ---------- Follow-ups ---------- */
+async function refreshFollowUps(quiet) {
+  if (state.mode === 'replay') {
+    const r = state.lastRecord;
+    if (r && r.needs_follow_up && !state.followUps.some(function (f) { return f.survey_id === r.survey_id; })) {
+      state.followUps.push({
+        follow_up_id: 'FU-' + r.survey_id + '-replay', farmer_id: r.farmer_id, survey_id: r.survey_id, response_key: r.response_key,
+        source_insight_ids: r.source_insight_ids, reasons: r.follow_up_reasons, accepted_answers: r.answers, created_at: r.recorded_at,
+      });
+    }
+    renderPanel5();
+    return;
+  }
+  try {
+    const r = await api('GET', 'followups', {});
+    if (!r.ok) throw new Error(describeError(r));
+    const b = r.body;
+    state.followUps = Array.isArray(b) ? b : (b && (b.items || b.follow_ups)) || [];
+    if (!quiet) say('Follow-ups: ' + state.followUps.length);
+  } catch (e) { setError('Follow-ups', e); }
+  renderPanel5();
+}
+
+/* ---------- Clock ---------- */
+function advance(ms) { state.clock += ms; renderAll(); }
+function jumpToWindowStart() {
+  const s = survey();
+  if (!s) { say('Decide on a survey first.'); return; }
+  state.clock = parseT(s.send_window.not_before);
+  renderAll();
+}
+function jumpPastWindow() {
+  const s = survey();
+  if (!s) { say('Decide on a survey first.'); return; }
+  state.clock = parseT(s.send_window.not_after) + 36e5;
+  renderAll();
+}
+function resetClock() { state.clock = parseT(sc().insight.created_at); renderAll(); }
+
+/* ---------- Rendering ---------- */
+function renderAll() {
+  renderModeBar(); renderStatus(); renderGuide(); renderPanel1(); renderPanel2(); renderPanel3(); renderPanel4(); renderPanel5(); renderRoutes();
+}
+
+function renderModeBar() {
+  const bar = $('#modebar');
+  bar.className = state.mode === 'replay' ? 'replay' : 'live';
+  bar.textContent = state.mode === 'replay'
+    ? 'REPLAY. Recorded pack data, no API calls. Records are built in this page.'
+    : 'LIVE. Calls the API with your Cognito token.';
+  $('#modeSwitch').checked = state.mode === 'replay';
+}
+
+function renderStatus() {
+  const box = $('#status');
+  if (!state.error) { box.replaceChildren(); box.hidden = true; return; }
+  box.hidden = false;
+  const kids = [h('strong', {}, state.error.where + ': '), state.error.msg];
+  if (state.error.network && state.mode !== 'replay') {
+    kids.push(h('button', { class: 'btn small', onclick: function () { setMode('replay'); } }, 'Switch to REPLAY'));
+  }
+  box.replaceChildren.apply(box, kids);
+}
+
+function setMode(m) {
+  state.mode = m;
+  if (m === 'replay') clearError();
+  renderAll();
+  renderConfig();
+}
+
+function renderConfig() {
+  const box = $('#signinState');
+  const kids = [];
+  if (state.mode === 'replay') kids.push(chip('not needed in REPLAY', 'warn'));
+  if (state.token && state.claims) {
+    kids.push(chip('signed in', 'ok'));
+    kids.push(h('span', { class: 'claims' }, ' farmer_id=' + (state.claims['custom:farmer_id'] || '?') + '  org_id=' + (state.claims['custom:org_id'] || '?')));
+    kids.push(h('button', { class: 'btn small', type: 'button', onclick: signOut }, 'Sign out'));
+  } else if (state.token) {
+    kids.push(chip('signed in (claims unreadable)', 'ok'));
+  } else {
+    kids.push(chip('not signed in', ''));
+  }
+  box.replaceChildren.apply(box, kids);
+}
+
+function renderGuide() {
+  const f = state.flags;
+  const steps = [
+    { n: 1, t: 'The outcome', d: 'Read this: after advice, ask 1 to 3 tap questions, measure what happened, reconnect farmers who need help. Then tap Mark done.', done: !!f.g1, manual: 'g1' },
+    { n: 2, t: 'Potato insight to survey', d: 'Pick scenario 3. Tap Decide. See rule R8 and the window.', done: !!f.decided3 },
+    { n: 3, t: 'Clock, sheet, follow-up', d: 'Tap Jump to window start. Open the Web tab. Tap Yes, then Spreading, then 1. A follow-up item appears in panel 5.', done: state.followUps.length > 0 },
+    { n: 4, t: 'Zero-tillage insight: no survey', d: 'Pick scenario 6. Tap Decide. See rule R3 and the reason.', done: !!f.decided6 },
+    { n: 5, t: 'Failures', d: 'Pick scenario 3, Decide, Jump to window start. App tab: Fail push_token_invalid. On the next channel answer one question, then Close partway. Then Duplicate submit, Opt out, and Decide again.', done: STEP5.every(function (x) { return f[x[0]]; }), sub: true },
+    { n: 6, t: 'Evidence', d: 'Open evidence/REPORT.md and the CloudWatch dashboard. Numbers live there, not here. Tap Mark done.', done: !!f.g6, manual: 'g6' },
+  ];
+  const cur = steps.find(function (s) { return !s.done; });
+  const ol = h('ol', { class: 'guide' }, steps.map(function (s) {
+    const kids = [
+      h('span', { class: 'gn' }, s.done ? '✓' : s.n),
+      h('div', {}, h('b', {}, s.t), h('div', { class: 'gd' }, s.d)),
+    ];
+    if (s.sub) {
+      kids[1].append(h('div', { class: 'subs' }, STEP5.map(function (x) { return chip((f[x[0]] ? '✓ ' : '') + x[1], f[x[0]] ? 'ok' : ''); })));
+    }
+    if (s.manual && !s.done) {
+      kids[1].append(h('button', { class: 'btn small', onclick: function () { state.flags[s.manual] = true; renderGuide(); } }, 'Mark done'));
+    }
+    return h('li', { class: (s.done ? 'done ' : '') + (cur === s ? 'cur' : '') }, kids);
+  }));
+  mount('#guide', ol);
+}
+
+function renderPanel1() {
+  const s = sc();
+  const ins = s.insight;
+  const sel = h('select', { id: 'scenario', 'aria-label': 'Scenario', onchange: function (e) { setScenario(Number(e.target.value)); } },
+    PACK.scenarios.map(function (x, i) { return h('option', { value: i, selected: i === state.scenarioIdx ? 'selected' : null }, (i + 1) + '. ' + x.title); }));
+  sel.value = String(state.scenarioIdx);
+  const insBox = h('div', { class: 'insight' },
+    kv('insight_id', ins.insight_id), kv('farmer_id (from the pack file)', ins.farmer_id), kv('created_at', ins.created_at),
+    kv('crop / asset', ins.asset.name + ' (' + ins.asset.category + ')'), kv('severity', ins.severity),
+    kv('resolution_type', ins.resolution_type), kv('verification.timing', ins.verification.timing),
+    h('p', { class: 'q' }, 'Q: ' + ins.query_summary), h('p', { class: 'q' }, 'Advice: ' + ins.advice_summary));
+  const btn = h('button', { class: 'btn primary', disabled: state.busy, onclick: doDecide }, state.busy ? 'Working...' : 'Decide');
+  const out = h('div', { class: 'result' });
+  const d = state.decided;
+  if (d && d.decision) {
+    const dec = d.decision;
+    add(out, 
+      h('div', { class: 'chips' },
+        chip('rule ' + dec.rule_id, dec.survey ? 'ok' : 'warn'),
+        chip(dec.survey ? 'survey' : 'no survey', dec.survey ? 'ok' : 'warn'),
+        dec.reason_code ? chip(dec.reason_code, '') : null,
+        dec.timing_profile ? chip(dec.timing_profile, '') : null,
+        d.status ? chip('status: ' + d.status, d.notSent ? 'bad' : '') : null),
+      d.notSent ? h('p', { class: 'alert' }, 'Not sent: ' + d.notSent + (d.reasons && d.reasons.length ? ' (' + d.reasons.join(', ') + ')' : '')) : null,
+      state.mode === 'replay' ? h('p', { class: 'replaytag' }, 'REPLAY: decision rebuilt from the pack scenario (R8 for survey rows, R3 for the info-only row).') : null);
+    if (d.suppressed) add(out, h('p', { class: 'alert' }, 'SUPPRESSED: farmer opted out (' + (d.suppressed.reason || 'farmer_opted_out') + '). No hand-off is sent.'));
+    if (d.survey) {
+      const w = d.survey.send_window;
+      add(out, 
+        h('div', { class: 'win' }, h('b', {}, 'Handoff window'), h('div', {}, fmtShort(parseT(w.not_before)) + '  to  ' + fmtShort(parseT(w.not_after)))),
+        d.handoff ? h('div', {},
+          kv('channel order', d.handoff.channel_order.map(function (c) { return c.channel + (c.wait_hours != null ? ' (' + c.wait_hours + 'h)' : ''); }).join(' > ')),
+          kv('send hours', d.handoff.send_hours.from + ' to ' + d.handoff.send_hours.to + ' IST'),
+          kv('priority', d.handoff.priority),
+          kv('frequency cap', d.handoff.frequency_cap.max_surveys + ' per ' + d.handoff.frequency_cap.window_days + ' days' + (d.handoff.frequency_cap.exempt ? ' (exempt)' : '')),
+          kv('expires_at', d.handoff.expires_at)) : null,
+        h('details', {}, h('summary', {}, 'Survey ' + d.survey.survey_id + ' (' + d.survey.language + '), ' + d.survey.items.length + ' questions'),
+          h('ol', { class: 'qs' }, d.survey.items.map(function (it) { return h('li', {}, it.prompt); })),
+          h('p', { class: 'muted' }, 'rationale: ' + (d.survey.rationale || '')),
+          h('p', { class: 'muted' }, 'self_eval: ' + JSON.stringify(d.survey.self_eval))));
+    } else if (d.noSurvey) {
+      add(out, h('div', { class: 'win' }, h('b', {}, 'NoSurvey (pack schema)'), h('div', {}, d.noSurvey.reason_code + ': ' + d.noSurvey.reason)));
+    }
+    add(out, h('details', {}, h('summary', {}, 'DecisionRecord JSON'), pre(dec)));
+  } else if (d) {
+    add(out, h('p', { class: 'alert' }, 'No decision record in the response.'));
+  } else {
+    add(out, h('p', { class: 'muted' }, 'Nothing decided yet.'));
+  }
+  mount('#p1', h('div', {}, h('label', { for: 'scenario' }, 'Scenario insight'), sel, insBox, btn, out));
+}
+
+function renderPanel2() {
+  const s = survey();
+  let status = chip('no window yet', '');
+  if (s) {
+    const w = s.send_window;
+    if (state.clock < parseT(w.not_before)) status = chip('before the window', 'warn');
+    else if (state.clock > parseT(w.not_after)) status = chip('window closed', 'bad');
+    else status = chip('inside the window', 'ok');
+  }
+  mount('#p2', h('div', {},
+    h('div', { class: 'clock' }, fmtShort(state.clock)),
+    h('div', { class: 'clockiso' }, fmt(state.clock)),
+    status,
+    h('div', { class: 'btnrow' },
+      h('button', { class: 'btn', onclick: function () { advance(36e5); } }, '+1 hour'),
+      h('button', { class: 'btn', onclick: function () { advance(864e5); } }, '+1 day'),
+      h('button', { class: 'btn', onclick: jumpToWindowStart }, 'Jump to window start'),
+      h('button', { class: 'btn ghost', onclick: jumpPastWindow }, 'Past window end'),
+      h('button', { class: 'btn ghost', onclick: resetClock }, 'Reset')),
+    h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: state.idle, onchange: function (e) { state.idle = e.target.checked; renderAll(); } }),
+      ' Chat idle (answer finished, no typing for 5 s, no call)'),
+    h('p', { class: 'muted' }, 'The clock is virtual. It never reaches the server clock.')));
+}
+
+function renderPanel3() {
+  const d = state.decided;
+  const order = d && d.handoff ? d.handoff.channel_order : [];
+  const tabs = h('div', { class: 'tabs', role: 'tablist' }, CHANNELS.map(function (c) {
+    const pos = order.findIndex(function (x) { return x.channel === c; });
+    return h('button', {
+      class: 'tab' + (state.channel === c ? ' on' : ''), role: 'tab', 'aria-selected': state.channel === c ? 'true' : 'false',
+      onclick: function () { if (state.channel !== c) { state.channel = c; state.run = newRun(); } renderAll(); },
+    }, c, pos >= 0 ? h('small', {}, ' #' + (pos + 1)) : null);
+  }));
+  const body = h('div', { class: 'chbody' });
+  const sv = survey();
+  const g = gateFor({ decided: d, clock: state.clock, idle: state.idle, channel: state.channel });
+  if (!sv || (d && d.suppressed)) {
+    body.append(h('p', { class: 'locked' }, g.reason));
+  } else {
+    if (!g.open) body.append(h('p', { class: 'locked' }, g.reason));
+    if (state.run.done) body.append(h('p', { class: 'locked ok' }, 'Attempt finished on ' + state.channel + (state.lastRecord ? ': ' + state.lastRecord.status : '') + '.'));
+    const ch = state.channel;
+    if (isSheet(ch)) body.append(viewSheet(sv, ch, g));
+    else if (ch === 'whatsapp') body.append(viewWhatsApp(sv, g));
+    else if (ch === 'telegram') body.append(viewTelegram(sv, g));
+    else body.append(viewVoice(sv, g));
+  }
+  mount('#p3', h('div', {}, tabs, body));
+}
+
+function optBtn(item, o, i, disabled) {
+  return h('button', { class: 'opt', disabled: disabled, onclick: function () { tap(item, o, i); } }, o.label);
+}
+
+function viewSheet(sv, ch, g) {
+  const sheet = renderSheet(sv, ch);
+  const run = state.run;
+  const wrap = h('div', { class: 'phone' });
+  const chat = h('div', { class: 'chatbg' },
+    h('div', { class: 'bubble in' }, sc().insight.advice_summary),
+    h('div', { class: 'bubble out' }, ch === 'app' ? 'Thanks. I will check.' : 'Okay.'),
+    h('div', { class: 'hint' }, ch === 'app' ? 'FarmerChat app' : 'FarmerChat web chat'));
+  wrap.append(chat);
+  const show = g.open && !run.done;
+  if (ch === 'app' && !run.done) {
+    chat.append(h('div', { class: 'push' }, 'Push: ' + sheet.sheet.title, h('small', {}, g.open ? ' (tapped)' : ' (waiting)')));
+  }
+  if (show) {
+    const idx = Math.min(run.idx, sheet.sheet.steps.length - 1);
+    const st = sheet.sheet.steps[idx];
+    const item = sv.items[idx];
+    const opts = optionList(item);
+    wrap.append(h('div', { class: 'sheet open', role: 'dialog', 'aria-label': sheet.sheet.title },
+      h('div', { class: 'grab' }),
+      h('div', { class: 'shead' }, h('b', {}, sheet.sheet.title),
+        h('button', { class: 'x', 'aria-label': sheet.sheet.close_label, onclick: closePartway }, '×')),
+      h('div', { class: 'step' }, st.step_label),
+      h('div', { class: 'qtext' }, st.question),
+      h('div', { class: item.type === 'survey-scale' ? 'opts row' : 'opts' }, opts.map(function (o, i) { return optBtn(item, o, i, false); })),
+      h('div', { class: 'sfoot' },
+        h('button', { class: 'link', onclick: skipItem }, sheet.sheet.skip_label),
+        h('button', { class: 'link', onclick: optOut }, 'Do not ask me again'))));
+  } else if (run.done && state.lastRecord && ['completed', 'negative_outcome', 'partial'].indexOf(state.lastRecord.status) >= 0) {
+    wrap.append(h('div', { class: 'sheet open' }, h('div', { class: 'grab' }), h('div', { class: 'thanks' }, sheet.sheet.thank_you)));
+  }
+  return h('div', {}, wrap, h('details', {}, h('summary', {}, 'Render JSON (matches pack render/en-IN/' + ch + '.json)'), pre(sheet)));
+}
+
+function viewWhatsApp(sv, g) {
+  const r = renderWhatsApp(sv);
+  const run = state.run;
+  const box = h('div', { class: 'chat wa' });
+  const dis = !g.open || run.done;
+  box.append(h('div', { class: 'bubble in' }, r.template_text_for_approval.body,
+    h('div', { class: 'qr' },
+      h('button', { class: 'opt', disabled: dis || run.waStarted, onclick: function () { if (!guardOpen()) return; state.run.waStarted = true; renderAll(); } }, r.template_text_for_approval.quick_replies[0]),
+      h('button', { class: 'opt', disabled: dis || run.waStarted, onclick: declineLater }, r.template_text_for_approval.quick_replies[1]))));
+  if (run.waStarted || run.idx > 0) {
+    sv.items.forEach(function (it, i) {
+      if (i > run.idx) return;
+      const m = r.messages[i];
+      const answered = it.item_id in run.answers;
+      const opts = optionList(it);
+      box.append(h('div', { class: 'bubble in' }, m.interactive.body.text,
+        answered ? null : h('div', { class: m.interactive.type === 'list' ? 'qr list' : 'qr' }, opts.map(function (o, k) { return optBtn(it, o, k, dis || i !== run.idx); }))));
+      if (answered) box.append(h('div', { class: 'bubble out' }, String(opts.find(function (o) { return o.value === run.answers[it.item_id]; }).label)));
+    });
+  }
+  return h('div', {}, box, h('details', {}, h('summary', {}, 'Render JSON'), pre(r)));
+}
+
+function viewTelegram(sv, g) {
+  const r = renderTelegram(sv);
+  const run = state.run;
+  const dis = !g.open || run.done;
+  const box = h('div', { class: 'chat tg' }, h('div', { class: 'bubble in' }, r.messages[0].text));
+  sv.items.forEach(function (it, i) {
+    if (i > run.idx) return;
+    const answered = it.item_id in run.answers;
+    const opts = optionList(it);
+    box.append(h('div', { class: 'bubble in' }, it.prompt,
+      answered ? null : h('div', { class: it.type === 'survey-scale' ? 'qr' : 'qr col' }, opts.map(function (o, k) { return optBtn(it, o, k, dis || i !== run.idx); }))));
+    if (answered) box.append(h('div', { class: 'bubble out' }, String(opts.find(function (o) { return o.value === run.answers[it.item_id]; }).label)));
+  });
+  return h('div', {}, box, h('details', {}, h('summary', {}, 'Render JSON'), pre(r)));
+}
+
+function viewVoice(sv, g) {
+  const r = renderVoice(sv);
+  const run = state.run;
+  const dis = !g.open || run.done;
+  const box = h('div', { class: 'chat voice' }, h('div', { class: 'bubble in' }, '☎ ' + r.opening));
+  sv.items.forEach(function (it, i) {
+    if (i > run.idx) return;
+    const answered = it.item_id in run.answers;
+    const opts = optionList(it);
+    box.append(h('div', { class: 'bubble in' }, '☎ ' + r.items[i].say,
+      answered ? null : h('div', { class: 'keypad' }, opts.map(function (o, k) {
+        const key = it.type === 'survey-scale' ? String(o.value) : String(k + 1);
+        return h('button', { class: 'opt key', disabled: dis || i !== run.idx, onclick: function () { tap(it, o, k); } }, key, h('small', {}, ' ' + o.label));
+      }))));
+    if (answered) box.append(h('div', { class: 'bubble out' }, 'pressed ' + state.run.rawInputs[it.item_id]));
+  });
+  if (run.done && state.lastRecord) {
+    box.append(h('div', { class: 'bubble in' }, '☎ ' + (state.lastRecord.needs_follow_up ? r.closing_if_follow_up : r.closing)));
+  }
+  return h('div', {}, box, h('details', {}, h('summary', {}, 'Render JSON'), pre(r)));
+}
+
+function renderPanel4() {
+  const run = state.run;
+  const rec = state.lastRecord;
+  const answers = Object.keys(run.answers).map(function (k) { return k + '=' + run.answers[k]; }).join('  ') || 'none yet';
+  const chBtn = function (code, label) {
+    return h('button', { class: 'btn warnbtn', onclick: function () { simFailure(code); } }, label);
+  };
+  const out = h('div', { class: 'result' });
+  if (rec) {
+    add(out, 
+      h('div', { class: 'chips' }, chip(rec.status, ['completed', 'partial', 'negative_outcome'].indexOf(rec.status) >= 0 ? 'ok' : (rec.status === 'duplicate' || rec.status === 'declined' ? 'warn' : 'bad')),
+        rec.failure_code ? chip(rec.failure_code, 'bad') : null,
+        chip('retry: ' + rec.retry_decision, ''),
+        chip('counts toward cap: ' + rec.counts_toward_cap, ''),
+        rec.needs_follow_up ? chip('needs follow-up', 'warn') : null),
+      state.mode === 'replay' ? h('p', { class: 'replaytag' }, 'REPLAY: this ResponseRecord was built in the page from the embedded outcome_codes table.') : null,
+      h('details', { open: 'open' }, h('summary', {}, 'ResponseRecord JSON'), pre(rec)));
+  } else {
+    add(out, h('p', { class: 'muted' }, 'No response sent yet. Tap an answer in panel 3.'));
+  }
+  const hist = state.history.length ? h('ul', { class: 'hist' }, state.history.slice(0, 6).map(function (x) {
+    return h('li', {}, fmtShort(x.at).slice(5) + '  ' + x.channel + '  ' + x.status + (x.code ? ' / ' + x.code : ''));
+  })) : null;
+  mount('#p4', h('div', {},
+    h('p', { class: 'muted' }, 'Answers so far: ' + answers),
+    h('div', { class: 'btnrow' },
+      chBtn('push_token_invalid', 'Fail: push_token_invalid'),
+      chBtn('client_cannot_render', 'Fail: client_cannot_render'),
+      h('button', { class: 'btn', onclick: closePartway }, 'Close partway'),
+      h('button', { class: 'btn', onclick: dupSubmit }, 'Duplicate submit'),
+      h('button', { class: 'btn dangerbtn', onclick: optOut }, 'Opt out')),
+    h('p', { class: 'muted' }, 'push_token_invalid: app tab only. client_cannot_render: app or web tab. Failures fall back to the next channel in the hand-off.'),
+    out, hist));
+}
+
+function renderPanel5() {
+  const list = state.followUps.length
+    ? h('ul', { class: 'fu' }, state.followUps.map(function (f) {
+      return h('li', {},
+        h('b', {}, f.survey_id || '(survey?)'), ' ',
+        (f.source_insight_ids || []).join(', '), ' ',
+        h('span', { class: 'chips' }, (f.reasons || f.follow_up_reasons || []).map(function (r) { return chip(r, 'warn'); })),
+        h('div', { class: 'muted' }, 'answers: ' + JSON.stringify(f.accepted_answers || f.answers || {})));
+    }))
+    : h('p', { class: 'muted' }, 'No follow-up items.');
+  mount('#p5', h('div', {}, h('button', { class: 'btn', onclick: function () { refreshFollowUps(false); } }, 'Refresh'), list));
+}
+
+function renderRoutes() {
+  const keys = Object.keys(state.routes);
+  mount('#routes', keys.length ? h('ul', {}, keys.map(function (k) { return h('li', {}, k + '  x' + state.routes[k]); })) : h('span', { class: 'muted' }, 'none yet (REPLAY makes no calls)'));
+}
+
+/* ---------- Boot ---------- */
+function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('api')) $('#api').value = q.get('api');
+  if (q.get('pool')) $('#pool').value = q.get('pool');
+  if (q.get('client')) $('#client').value = q.get('client');
+  if (q.get('user')) $('#user').value = q.get('user');
+  if (q.get('replay') === '1') state.mode = 'replay';
+  $('#signin').addEventListener('submit', function (e) { e.preventDefault(); signIn(); });
+  $('#modeSwitch').addEventListener('change', function (e) { setMode(e.target.checked ? 'replay' : 'live'); });
+  $('#resetAll').addEventListener('click', function () { location.reload(); });
+  ['decide', 'respond', 'events', 'followups'].forEach(function (k) { $('#route-' + k).value = DEFAULT_ROUTES[k]; });
+  renderConfig();
+  renderAll();
+}
+init();
+
+</script>
+</body>
+</html>

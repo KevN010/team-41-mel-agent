@@ -162,7 +162,8 @@ def test_openai_request_has_strict_schema_and_user_turn_only(models_file):
         "messages": [{"role": "user", "content": [{"text": "INSIGHT TEXT"}]}],
         "inferenceConfig": {"maxTokens": 600},
         "additionalModelRequestFields": {
-            "text": {"format": {"type": "json_schema", "name": "survey", "strict": True, "schema": SCHEMA}}
+            "text": {"format": {"type": "json_schema", "name": "survey", "strict": True, "schema": SCHEMA}},
+            "reasoning": {"effort": "low"},
         },
     }
     with Stubber(client) as st:

@@ -49,6 +49,7 @@ DecisionStatus = Literal[
     "no_survey",         # R1..R7
     "timing_exception",  # R8 but no legal send window
     "opted_out",         # R8 but the farmer asked for no more surveys
+    "frequency_capped",  # R8 but the farmer already had max_surveys counted in window_days (rules.json)
     "failed_review",     # generation failed validation after the one retry
     "pending_review",    # Jev flagged the survey or could not answer (fails closed)
 ]
@@ -201,6 +202,18 @@ def _language(insight: Insight, deps: DecideDeps) -> str:
     return insight.conversation_language if insight.conversation_language in allowed else allowed[0]
 
 
+def _capped(identity: Identity, insight: Insight, deps: DecideDeps) -> bool:
+    cap = deps.rules.get("frequency_cap") if isinstance(deps.rules, Mapping) else None
+    if not cap:
+        return False
+    from mel.handoff import priority_for
+
+    if priority_for(insight, dict(deps.rules)) in cap.get("exempt_priority", ()):
+        return False
+    count = deps.ledger.cap_count(identity.org_id, identity.farmer_id, int(cap["window_days"]), deps.clock.now())
+    return count >= int(cap["max_surveys"])
+
+
 # --------------------------------------------------------------------------- entry point
 
 
@@ -247,6 +260,11 @@ def run_decision(identity: Identity, insight_dict: Mapping[str, Any], deps: Deci
     if ledger.is_opted_out(org, identity.farmer_id):
         return DecisionResult("opted_out", decision)
 
+    # 3b. frequency cap (rules.json frequency_cap): counted outcomes in the last window_days.
+    # Exempt priorities (high) are never capped. Checked before the model call, so no cost.
+    if _capped(identity, insight, deps):
+        return DecisionResult("frequency_capped", decision, reasons=("frequency_cap",))
+
     # 4. generate (model + Jev)
     seq = ledger.next_survey_seq(org)
     with _Timer(deps, "generate"):
@@ -269,6 +287,9 @@ def run_decision(identity: Identity, insight_dict: Mapping[str, Any], deps: Deci
     ok, _errors = validate_against_pack(handoff, "schedule_handoff")
     if not ok or handoff.survey.farmer_id != identity.farmer_id:
         return DecisionResult("failed_review", decision, reasons=("handoff_schema",), cost_usd=cost)
+    # An opt-out can land while generation runs (seconds). Re-check right before the writes.
+    if ledger.is_opted_out(org, identity.farmer_id):
+        return DecisionResult("opted_out", decision, reasons=("opted_out_during_generation",), cost_usd=cost)
     with _Timer(deps, "ledger"):
         ledger.put_survey(org, survey, handoff.expires_at)
         ledger.put_handoff(org, handoff)

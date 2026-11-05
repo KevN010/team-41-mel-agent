@@ -53,6 +53,7 @@ log = logging.getLogger(__name__)
 THROTTLE_RETRIES = 3  # retries after the first attempt, ThrottlingException only
 BACKOFF_BASE_S = 1.0  # 1 s, 2 s, 4 s
 TOOL_NAME = "emit_json"
+REASONING_EFFORT = "low"  # OpenAI family only
 
 _INPUT_KEYS = ("input_per_m", "input", "in")
 _OUTPUT_KEYS = ("output_per_m", "output", "out")
@@ -179,7 +180,9 @@ class BedrockChat:
             req["additionalModelRequestFields"] = {
                 "text": {
                     "format": {"type": "json_schema", "name": name, "strict": True, "schema": schema}
-                }
+                },
+                # NOTES-MODEL: without low effort luna spent the 600-token cap on reasoning (12/15 cut off).
+                "reasoning": {"effort": REASONING_EFFORT},
             }
         elif self.spec.family == "anthropic":
             req["toolConfig"] = {

@@ -53,13 +53,20 @@ log = logging.getLogger(__name__)
 THROTTLE_RETRIES = 3  # retries after the first attempt, ThrottlingException only
 BACKOFF_BASE_S = 1.0  # 1 s, 2 s, 4 s
 TOOL_NAME = "emit_json"
+REASONING_EFFORT = "low"  # OpenAI family only
 
 _INPUT_KEYS = ("input_per_m", "input", "in")
 _OUTPUT_KEYS = ("output_per_m", "output", "out")
 
 
 class ProviderError(Exception):
-    """A model call failed or returned something unusable. The message never holds model text."""
+    """A model call failed or returned something unusable. The message never holds model text.
+
+    ``usage`` is set when Bedrock answered (billed) but the output was unusable, for example cut at
+    max_tokens or not JSON, so the caller can still count the tokens of the failed call.
+    """
+
+    usage: Usage | None = None
 
 
 @dataclass(frozen=True)
@@ -179,7 +186,9 @@ class BedrockChat:
             req["additionalModelRequestFields"] = {
                 "text": {
                     "format": {"type": "json_schema", "name": name, "strict": True, "schema": schema}
-                }
+                },
+                # NOTES-MODEL: without low effort luna spent the 600-token cap on reasoning (12/15 cut off).
+                "reasoning": {"effort": REASONING_EFFORT},
             }
         elif self.spec.family == "anthropic":
             req["toolConfig"] = {
@@ -263,7 +272,11 @@ class BedrockChat:
         response = self._call(request)
         latency_ms = (time.perf_counter() - started) * 1000.0
         usage_in = response.get("usage") or {}
-        in_tok = int(usage_in.get("inputTokens", 0))
+        # OpenAI on Bedrock reports cached prompt tokens apart from inputTokens (live: inputTokens=2).
+        # Count them at the full rate, as evals/model_select.py does: cost is an upper bound.
+        in_tok = int(usage_in.get("inputTokens", 0)) + int(usage_in.get("cacheReadInputTokens", 0)) + int(
+            usage_in.get("cacheWriteInputTokens", 0)
+        )
         out_tok = int(usage_in.get("outputTokens", 0))
         cost = compute_cost(self.spec, in_tok, out_tok)
         usage = Usage(
@@ -277,7 +290,11 @@ class BedrockChat:
             "model_call model=%s in=%d out=%d latency_ms=%.0f", usage.model_id, in_tok, out_tok, latency_ms
         )
         self._emit_metrics(usage)
-        return self._extract(response), usage
+        try:
+            return self._extract(response), usage
+        except ProviderError as exc:
+            exc.usage = usage  # a failed call still counts
+            raise
 
     async def aconverse_json(self, *args: Any, **kwargs: Any) -> tuple[dict[str, Any], Usage]:
         """Async wrapper: runs converse_json in a worker thread. The shared bucket is thread safe."""

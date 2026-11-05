@@ -159,6 +159,9 @@ def generate_survey(
             )
         except Exception as exc:  # noqa: BLE001 - any provider or parse error is a failed attempt
             name = type(exc).__name__
+            failed_usage = getattr(exc, "usage", None)
+            if isinstance(failed_usage, Usage):  # Bedrock answered and billed it: count the tokens
+                usage.append(failed_usage)
             reasons.append(f"attempt{attempt}: generator_error:{name}")
             repair = [f"the previous attempt failed ({name}); return one JSON object that matches the schema"]
             log.warning("generate attempt failed", extra=_log_extra(insight, survey_id, attempt, model_key, None))

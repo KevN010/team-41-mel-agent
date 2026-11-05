@@ -21,6 +21,26 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+# Deployed packages (Lambda zip, agent container) hold mel/ and models/ but not pack/. The runtime
+# subset of the pack (schemas, rules, crop calendar) is kept in mel/_pack; tests/test_runtime_pack.py
+# checks it is byte-identical to pack/.
+RUNTIME_PACK_DIR = Path(__file__).resolve().parent / "_pack"
+
+
+def _default_pack_dir() -> Path:
+    full = REPO_ROOT / "pack"
+    return full if (full / "json" / "schemas").is_dir() else RUNTIME_PACK_DIR
+
+
+# The deployed environment (infra/app.py, CLAUDE.md) uses MEL_* names. A plain name wins when both
+# are set, so tests and local runs keep working.
+ENV_ALIASES = {
+    "MEL_REGION": "REGION",
+    "MEL_TABLE": "LEDGER_TABLE",
+    "MEL_FOLLOWUP_QUEUE_URL": "FOLLOW_UP_QUEUE_URL",
+    "MEL_MODELS_FILE": "MODELS_FILE",
+    "MEL_METRICS_NAMESPACE": "METRICS_NAMESPACE",
+}
 
 JEV_CHECKS = (
     "matches_advice",
@@ -39,7 +59,7 @@ class Settings(BaseModel):
     TIMING_PROFILE: Literal["golden_v1", "rules_v1"] = "golden_v1"
     RATE_LIMIT_RPM: int = Field(60, ge=1)
     MODELS_FILE: Path = REPO_ROOT / "models" / "models.yaml"
-    PACK_DIR: Path = REPO_ROOT / "pack"
+    PACK_DIR: Path = Field(default_factory=_default_pack_dir)
     SEASON_END: date = date(2027, 3, 31)
     MAX_TOKENS: int = Field(600, ge=1)
 
@@ -71,6 +91,12 @@ class Settings(BaseModel):
             return [part.strip() for part in value.split(",") if part.strip()]
         return value
 
+    @field_validator("MODELS_FILE", mode="after")
+    @classmethod
+    def _models_file_from_root(cls, value: Path) -> Path:
+        # MEL_MODELS_FILE is "models/models.yaml" in the deployed env: relative to the package root.
+        return value if value.is_absolute() else REPO_ROOT / value
+
     @field_validator("REGION")
     @classmethod
     def _region_fixed(cls, value: str) -> str:
@@ -85,7 +111,12 @@ class Settings(BaseModel):
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
         env = os.environ if env is None else env
-        values = {name: env[name] for name in cls.model_fields if name in env and env[name] != ""}
+        values = {
+            field: env[alias]
+            for alias, field in ENV_ALIASES.items()
+            if env.get(alias) and field in cls.model_fields
+        }
+        values |= {name: env[name] for name in cls.model_fields if name in env and env[name] != ""}
         return cls.model_validate(values)
 
 

@@ -121,7 +121,7 @@ footer{max-width:1100px;margin:0 auto;padding:0 16px 24px;font-size:.8rem;color:
       <div class="grid2">
         <div><label for="route-decide">POST decide</label><input type="text" id="route-decide"></div>
         <div><label for="route-respond">POST response</label><input type="text" id="route-respond"></div>
-        <div><label for="route-events">POST failure, decline, opt-out (not in J's intake yet)</label><input type="text" id="route-events"></div>
+        <div><label for="route-events">POST failure, decline, opt-out (same route as answers, with kind)</label><input type="text" id="route-events"></div>
         <div><label for="route-followups">GET follow-ups</label><input type="text" id="route-followups"></div>
       </div>
     </details>
@@ -469,7 +469,9 @@ function nextChannel(handoff, current) {
 const PACK = JSON.parse(document.getElementById('pack-data').textContent);
 const CODES = PACK.codes;
 
-const DEFAULT_ROUTES = { decide: '/surveys/decide', respond: '/surveys/{survey_id}/responses', events: '/surveys/{survey_id}/events', followups: '/follow-ups' };
+const DEFAULT_ROUTES = { decide: '/surveys/decide', respond: '/surveys/{survey_id}/responses', events: '/surveys/{survey_id}/responses', followups: '/follow-ups' };
+// Deployed stack (us-west-2, infra/INFRA.md). Ids, not secrets. API CORS allows only the CloudFront origin.
+const DEPLOYED = { api: 'https://ib6pvb874g.execute-api.us-west-2.amazonaws.com', pool: 'us-west-2_9ZHQYVRnk', client: '77e4o94o10nau3utvc9tvjogto' };
 const STEP5 = [
   ['pushfail', 'push_token_invalid, falls back'],
   ['partial', 'closed partway, partial'],
@@ -1240,9 +1242,9 @@ function renderRoutes() {
 /* ---------- Boot ---------- */
 function init() {
   const q = new URLSearchParams(location.search);
-  if (q.get('api')) $('#api').value = q.get('api');
-  if (q.get('pool')) $('#pool').value = q.get('pool');
-  if (q.get('client')) $('#client').value = q.get('client');
+  $('#api').value = q.get('api') || DEPLOYED.api;
+  $('#pool').value = q.get('pool') || DEPLOYED.pool;
+  $('#client').value = q.get('client') || DEPLOYED.client;
   if (q.get('user')) $('#user').value = q.get('user');
   if (q.get('replay') === '1') state.mode = 'replay';
   $('#signin').addEventListener('submit', function (e) { e.preventDefault(); signIn(); });

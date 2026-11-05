@@ -302,6 +302,8 @@ def submit_response(
         return dup
 
     log.info("intake stored", extra={"status": record.status, "failure_code": record.failure_code})
+    if record.counts_toward_cap:  # outcome_codes.json; record_cap counts a survey once
+        ledger.record_cap(org, farmer, record.survey_id, now)
     if record.needs_follow_up:
         _queue_follow_up(org, record, ledger, queue, now)
     return record

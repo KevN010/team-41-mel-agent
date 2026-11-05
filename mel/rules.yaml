@@ -1,0 +1,30 @@
+# Decision rules, applied in order; the first match wins. Pure data: the condition names
+# are looked up in mel/rules.py (CONDITIONS). Parameters (send_window_days, season end)
+# come from pack/json/rules/rules.json, passed to decide() as `rules`.
+# reason_code is one of the 7 golden codes; R8 (survey) has none.
+# Mapping to the 2-code no_survey schema is done in mel/handoff.py, not here.
+rules:
+  - id: R1
+    condition: junk_or_invalid
+    reason_code: junk_insight
+  - id: R2
+    condition: severity_critical
+    reason_code: critical_needs_human_call
+  - id: R3
+    condition: resolution_generic_information
+    reason_code: nothing_to_verify
+  - id: R4
+    condition: resolution_needs_more_context
+    reason_code: waiting_for_details
+  - id: R5
+    condition: verification_not_needed
+    reason_code: no_check_needed
+  - id: R6
+    condition: window_starts_after_season
+    reason_code: window_after_season
+  - id: R7
+    condition: crop_already_harvested
+    reason_code: crop_already_harvested
+  - id: R8
+    condition: otherwise
+    reason_code: null

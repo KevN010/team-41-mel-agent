@@ -25,9 +25,9 @@ from mel.models import Insight, JudgeVerdict, Survey
 log = logging.getLogger("mel.wiring")
 
 JEV_KEY_TTL_S = 300.0
-# System One requires "model" (HTTP 422 without it). jev-1.14.0 is the model FarmerChat's working
-# client uses (Dwayne, 2026-11-05). JEV_MODEL overrides it.
-DEFAULT_JEV_MODEL = "jev-1.14.0"
+# System One requires "model" (HTTP 422 without it). jev-latest matches main (Dwayne, 2026-11-05);
+# JEV_MODEL overrides it.
+DEFAULT_JEV_MODEL = "jev-latest"
 PLACEHOLDERS = {"", "REPLACE_ME", "replace_me", "CHANGEME"}
 SSM_NAMES = {
     "MEL_TABLE": "table_name",

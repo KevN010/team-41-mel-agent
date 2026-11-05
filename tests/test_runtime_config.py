@@ -114,7 +114,7 @@ def test_jev_request_names_a_model():
     inner._transport = httpx.MockTransport(transport)
     with pytest.raises(JevError):
         inner._post({"x": 1}, inner._monotonic())
-    assert seen["model"] == "jev-1.14.0"
+    assert seen["model"] == "jev-latest"
 
 
 def test_cached_input_tokens_are_counted():

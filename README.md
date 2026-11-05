@@ -36,7 +36,7 @@ flowchart LR
 2. The caller identity comes only from Cognito token claims: `custom:farmer_id` and `custom:org_id`.
 3. Rules R1 to R8 decide survey or no survey. The first match wins. No model is used here.
 4. The timing profile sets the send window. The default is `golden_v1`. `rules_v1` stays available.
-5. For R8, the generator calls a Bedrock model through the Converse API. Output tokens are capped at 600.
+5. For R8, the generator calls a Bedrock model through the Converse API. Output tokens are capped by `MAX_TOKENS`. The evidence run used 900, not the 600 in CLAUDE.md.
 6. A schema check runs on the output. A bounded repair loop retries if the check fails. Our validator sets `schema_valid`. The model does not.
 7. Jev checks the survey for injected instructions and for new advice. Jev never writes text.
 8. The survey and hand-off go to the DynamoDB ledger. Every read and write uses `org_id` and `farmer_id`.
@@ -105,7 +105,7 @@ Put the Jev key into Secrets Manager by hand. Do not commit it.
 - `mel/agent.py` (the AgentCore entrypoint), `mel/api/handler.py` (the Lambda handler), `KNOWN-ISSUES.md` and `evidence/e2e-run-1.md` are on PR #23, not on `main` yet.
 - The routes the simulator uses (`GET /follow-ups`, and `POST /surveys/{id}/responses` with `kind` for failures and opt-outs) are on PR #23. See `sim/README.md`.
 - The Lambda path with a sign-in is not traced end to end yet. The trace runs through the AgentCore Runtime. See `KNOWN-ISSUES.md`.
-- `evidence/` is gitignored. `evidence/REPORT.md` is on branch `claude/project-thread-3nz941`, not on `main`.
+- `evidence/` is gitignored. `evidence/REPORT.md` is tracked on `main`.
 
 ## More
 

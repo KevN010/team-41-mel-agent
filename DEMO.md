@@ -4,7 +4,7 @@
 
 The demo has six steps. Steps 1 and 6 are read-aloud steps. Steps 2 to 5 use the simulator.
 
-Every number in this script is a placeholder. Read the real number from `evidence/REPORT.md` on the day you present.
+The step 6 numbers come from `evidence/REPORT.md` on main, from the evals run. Re-read them on the day you present, in case the report changes.
 
 ## Before you start (not timed)
 
@@ -12,7 +12,7 @@ Every number in this script is a placeholder. Read the real number from `evidenc
 - [ ] Set the server demo clock to the window start for scenario 3. The sim's Jump button moves only the sim clock, not the server clock. Run `.venv/bin/python scripts/e2e_run.py --set-clock <ISO>` for org `org.farmerchat`. Use the `not_before` value in `pack/json/scenarios/3-potato-blight-wait/survey.en-IN.json`. This command is on PR #23.
 - [ ] Sign in with seeded farmer A. The password is in the local seed file only. Keep it off the screen.
 - [ ] Open CloudWatch dashboard `mel-agent` in `us-west-2`.
-- [ ] Open `evidence/REPORT.md`. It is not on main. Its branch is `claude/project-thread-3nz941`.
+- [ ] Open `evidence/REPORT.md`. It is on main.
 - [ ] Run the whole script once. Present from the second run, with a fresh farmer B for step 5 and a new farmer A if you need one.
 
 ## The six steps
@@ -30,7 +30,7 @@ If the API is down, switch to REPLAY and say "REPLAY" aloud before step 2.
 
 5. **3:15 to 5:15. Failures.** Click: sign in as farmer B. Set the server clock to scenario 1's window start (its `not_before` in `pack/json/scenarios/1-mustard-aphid-spray/survey.en-IN.json`). Choose scenario 1 (mustard), tap Decide, tap Jump to window start. In the App tab, tap Fail push_token_invalid. On the next channel, answer one question, then tap Close partway. Tap Duplicate submit. Tap Opt out. Tap Decide again. Say: "A bad app token sends the survey to the next channel. If the farmer stops early, the outcome is partial. A duplicate answer is rejected. After opt-out, Decide returns opted out, so no survey is sent." [REPLAY if API down. Farmer B, because farmer A is capped by step 3 and opted out here would block the next run.]
 
-6. **5:15 to 6:00. Evidence.** Click: open `evidence/REPORT.md`, then the CloudWatch dashboard `mel-agent`. Tap Mark done. Say: "Golden rule match is [number from evidence/REPORT.md]. Outcome fixtures passing: [number from evidence/REPORT.md]. Latency p50 and p95: [numbers from evidence/REPORT.md]. Cost per accepted survey: [number from evidence/REPORT.md]. The model table and the security controls are in the same report."
+6. **5:15 to 6:00. Evidence.** Click: open `evidence/REPORT.md`, then the CloudWatch dashboard `mel-agent`. Tap Mark done. Say: "All 150 golden rows match the rules. All 95 golden send windows match the default timing. All 183 outcome fixtures pass. Each model call takes 2,577 milliseconds at the median and 4,105 milliseconds at the 95th percentile. Cost per accepted survey is $0.000818, with failed calls counted. Prices are unverified, so that cost is an estimate. The model table and the security controls are in the same report."
 
 ## Total time
 

@@ -9,7 +9,12 @@ Security rules (CLAUDE.md):
     range, and it is never logged.
 
 Rejections raise IntakeError (code + HTTP status). Accepted submissions return a
-ResponseRecord (status completed, partial, negative_outcome, or duplicate).
+ResponseRecord (status completed, partial, negative_outcome, duplicate, or stale).
+
+Duplicates: the ledger decides. put_response is idempotent on response_key and returns
+DUPLICATE; the first record stays untouched. Intake then asks apply_event (agent D) only to
+shape the duplicate record (attempt.already_answered plus existing=first). The same event
+replayed at the same instant returns the first record unchanged (D's transport-retry rule).
 
 Rejection codes
   invalid_request   400  payload is not valid JSON-shape (extra key, wrong type, bad survey id)
@@ -85,8 +90,8 @@ class IntakeError(Exception):
 
 
 def success_status(record: ResponseRecord) -> int:
-    """HTTP status for an accepted submission: 200 for a duplicate, 201 for a stored answer."""
-    return 200 if record.status == "duplicate" else 201
+    """HTTP status for a handled submission: 201 stored answer, 200 duplicate, 410 stale (late tap)."""
+    return {"duplicate": 200, "stale": 410}.get(record.status, 201)
 
 
 class ResponsePayload(BaseModel):
@@ -190,62 +195,6 @@ def _parse_payload(payload: Any) -> ResponsePayload:
         raise IntakeError("invalid_request") from None
 
 
-def _duplicate_record(
-    survey: Survey,
-    attempt: Attempt,
-    answers: Mapping[str, Any],
-    first: ResponseRecord | None,
-    payload: ResponsePayload,
-    codes: Mapping[str, Any],
-    now: datetime,
-    identity: Identity,
-) -> ResponseRecord:
-    """The record returned for a repeat of a stored response_key. It is never persisted."""
-    rule = codes["failures"]["duplicate_answer"]
-    items = []
-    for item in survey.items:
-        if item.item_id in answers:
-            value = answers[item.item_id]
-            items.append(
-                {"item_id": item.item_id, "item_type": item.type, "result": "discarded", "value": value,
-                 "raw_input": str(value)[:256], "input_kind": payload.input_kind, "attempts": 1}
-            )
-        else:
-            items.append(
-                {"item_id": item.item_id, "item_type": item.type, "result": "not_reached", "value": None,
-                 "raw_input": None, "input_kind": None, "attempts": 0}
-            )
-    timestamps = first.timestamps.to_pack() if first else {"sent": None, "delivered": None, "opened": None}
-    timestamps["answered"] = now.isoformat(timespec="seconds")
-    return ResponseRecord.model_validate(
-        {
-            "response_key": attempt.response_key,
-            "survey_id": survey.survey_id,
-            "farmer_id": identity.farmer_id,
-            "source_insight_ids": list(survey.source_insight_ids),
-            "channel": attempt.channel,
-            "language": survey.language,
-            "status": rule["status"],
-            "failure_code": "duplicate_answer",
-            "answers": {},
-            "items": items,
-            "complete": False,
-            "delivery_attempt": attempt.delivery_attempt,
-            "timestamps": timestamps,
-            "recorded_at": now,
-            "answered_by": identity.farmer_id,
-            "sheet_outcome": payload.sheet_outcome,
-            "raw_event": None,
-            "retry_decision": rule["retry_decision"],
-            "retry_after_minutes": rule["retry_after_minutes"],
-            "counts_toward_cap": rule["counts_toward_cap"],
-            "farmerchat_reply": {"http_status": 200, "outcome": "duplicate"},
-            "needs_follow_up": False,
-            "follow_up_reasons": [],
-        }
-    )
-
-
 def _follow_up_item(record: ResponseRecord, now: datetime) -> FollowUpItem:
     digest = hashlib.sha256(f"{record.survey_id}|{record.response_key}".encode()).hexdigest()[:12]
     return FollowUpItem(
@@ -258,6 +207,18 @@ def _follow_up_item(record: ResponseRecord, now: datetime) -> FollowUpItem:
         accepted_answers=dict(record.answers),
         created_at=now,
     )
+
+
+def _build(
+    build: Callable[..., ResponseRecord], survey: Survey, attempt: Any, event: dict[str, Any],
+    clock: Clock, codes: Mapping[str, Any], **kwargs: Any,
+) -> ResponseRecord:
+    try:
+        return build(survey, attempt, event, clock, codes, **kwargs)
+    except Exception as exc:  # mel.outcomes.InvalidAnswer: a value the sheet cannot produce
+        if type(exc).__name__ != "InvalidAnswer":
+            raise
+        raise IntakeError("invalid_answer") from None
 
 
 def _default_apply_event() -> Callable[..., ResponseRecord]:
@@ -312,10 +273,6 @@ def submit_response(
         created_at=now,
     )
 
-    first = ledger.get_response(org, farmer, body.response_key)
-    if first is not None:
-        return _duplicate_record(survey, attempt, answers, first, body, codes, now, identity)
-
     event: dict[str, Any] = {
         "kind": "answer",
         "channel": body.channel,
@@ -326,7 +283,8 @@ def submit_response(
         "farmer_id": farmer,  # the JWT farmer, never a body value
         "at": now,
     }
-    record = (apply_event or _default_apply_event())(survey, attempt, event, clock, codes)
+    build = apply_event or _default_apply_event()
+    record = _build(build, survey, attempt, event, clock, codes)
 
     # Every emitted record is validated against the pack schema before persisting.
     ok, _errors = validate_against_pack(record, "response")  # errors may echo values: not logged
@@ -334,9 +292,18 @@ def submit_response(
         log.error("intake produced an invalid record")
         raise IntakeError("internal_error")
 
-    if ledger.put_response(org, record) is PutOutcome.DUPLICATE:  # lost a race with a retry
+    # Duplicate detection belongs to the ledger: put_response is idempotent on response_key.
+    if ledger.put_response(org, record) is PutOutcome.DUPLICATE:
         first = ledger.get_response(org, farmer, body.response_key)
-        return _duplicate_record(survey, attempt, answers, first, body, codes, now, identity)
+        # The state machine only shapes the duplicate record. The first record stays untouched.
+        dup_attempt = {**attempt.model_dump(mode="json"), "already_answered": True}
+        dup = _build(build, survey, dup_attempt, event, clock, codes, existing=first)
+        ok, _errors = validate_against_pack(dup, "response")
+        replay = first is not None and dup == first  # same event again: D returns the first record as is
+        if not ok or dup.farmer_id != farmer or not (dup.status == "duplicate" or replay):
+            log.error("intake produced an invalid duplicate record")
+            raise IntakeError("internal_error")
+        return dup
 
     log.info("intake stored", extra={"status": record.status, "failure_code": record.failure_code})
     if record.needs_follow_up:

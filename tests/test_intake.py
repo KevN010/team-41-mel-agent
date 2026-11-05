@@ -105,11 +105,44 @@ class MemLedger:
     def is_opted_out(self, org_id, farmer_id): return False
 
 
-def fake_apply_event(survey, attempt, event, clock, codes):
-    """Follows the apply_event contract for answer events (success statuses only)."""
+def _duplicate_shape(survey, attempt, event, existing, now, codes):
+    """Shape of a duplicate_answer record, as in pack/json/outcomes/*/duplicate_answer.json."""
+    rule = codes["failures"]["duplicate_answer"]
+    items = []
+    for item in survey.items:
+        if item.item_id in event["answers"]:
+            v = event["answers"][item.item_id]
+            items.append({"item_id": item.item_id, "item_type": item.type, "result": "discarded", "value": v,
+                          "raw_input": str(v), "input_kind": event["input_kind"], "attempts": 1})
+        else:
+            items.append({"item_id": item.item_id, "item_type": item.type, "result": "not_reached",
+                          "value": None, "raw_input": None, "input_kind": None, "attempts": 0})
+    stamps = existing.timestamps.to_pack() if existing else {"sent": None, "delivered": None, "opened": None}
+    stamps["answered"] = now.isoformat(timespec="seconds")
+    return ResponseRecord.model_validate({
+        "response_key": attempt["response_key"], "survey_id": survey.survey_id, "farmer_id": survey.farmer_id,
+        "source_insight_ids": survey.source_insight_ids, "channel": attempt["channel"],
+        "language": survey.language, "status": rule["status"], "failure_code": "duplicate_answer",
+        "answers": {}, "items": items, "complete": False, "delivery_attempt": attempt["delivery_attempt"],
+        "timestamps": stamps, "recorded_at": now, "answered_by": survey.farmer_id,
+        "sheet_outcome": event.get("sheet_outcome"), "raw_event": None,
+        "retry_decision": rule["retry_decision"], "retry_after_minutes": rule["retry_after_minutes"],
+        "counts_toward_cap": rule["counts_toward_cap"],
+        "farmerchat_reply": {"http_status": 200, "outcome": "duplicate"},
+        "needs_follow_up": False, "follow_up_reasons": [],
+    })
+
+
+def fake_apply_event(survey, attempt, event, clock, codes, *, existing=None):
+    """Follows the apply_event contract (agent D) for answer events. The duplicate path mirrors D:
+    it fires when the attempt dict says already_answered or ``existing`` holds answers."""
     assert event["kind"] == "answer"
     assert event["farmer_id"] == survey.farmer_id  # intake must pass the JWT farmer
     now = clock.now()
+    if existing is not None and existing.timestamps.answered == now:
+        return existing  # same event again (transport retry): the first record, unchanged
+    if isinstance(attempt, dict) and (attempt.get("already_answered") or (existing and existing.answers)):
+        return _duplicate_shape(survey, attempt, event, existing, now, codes)
     answers = dict(event["answers"])
     reasons: list[str] = []
     items = []
@@ -295,19 +328,61 @@ def test_duplicate_of_negative_outcome_does_not_requeue(me, ledger, clock, codes
     assert len(sqs.sent) == 1 and len(ledger.list_follow_ups(ORG)) == 1
 
 
-def test_duplicate_race_on_put_response(me, ledger, clock, codes, queue, monkeypatch):
-    """get_response misses but put_response says DUPLICATE (two retries in flight)."""
+def test_duplicate_is_detected_by_put_response_and_shaped_by_apply_event(me, ledger, clock, codes, queue):
     first = submit(me, ledger, clock, codes, queue)
-    real_get = ledger.get_response
-    calls = {"n": 0}
+    seen = []
 
-    def flaky_get(org, farmer, key):
-        calls["n"] += 1
-        return None if calls["n"] == 1 else real_get(org, farmer, key)
+    def spy(survey, attempt, event, clock_, codes_, *, existing=None):
+        seen.append((attempt, existing))
+        return fake_apply_event(survey, attempt, event, clock_, codes_, existing=existing)
 
-    monkeypatch.setattr(ledger, "get_response", flaky_get)
+    clock.advance(timedelta(minutes=1))
+    again = submit_response(me, SURVEY_ID, payload(), ledger, clock, codes, apply_event=spy, queue=queue)
+    assert again.status == "duplicate"
+    (first_call, second_call) = seen
+    assert not hasattr(first_call[0], "get") and first_call[1] is None  # first pass: no pre-check
+    assert second_call[0]["already_answered"] is True and second_call[1] == first
+    assert ledger.get_response(ORG, FARMER, "rk-1") == first
+
+
+def test_same_event_again_replays_the_first_record(me, ledger, clock, codes, queue, sqs):
+    first = submit(me, ledger, clock, codes, queue, payload(answers={"q1": "yes", "q2": "spreading", "q3": 3}))
+    again = submit(me, ledger, clock, codes, queue, payload(answers={"q1": "yes", "q2": "spreading", "q3": 3}))
+    assert again == first and len(ledger.responses) == 1 and len(sqs.sent) == 1
+
+
+def test_duplicate_of_a_record_without_answers_is_still_duplicate(me, ledger, clock, codes, queue):
+    """The first record under this key holds no answers (a failure record). put_response still says
+    DUPLICATE, so the caller gets a duplicate and the first record stays."""
+    first = submit(me, ledger, clock, codes, queue, payload(answers={"q1": "yes"}))
+    ledger.responses[(ORG, FARMER, "rk-1")] = first.model_copy(update={"answers": {}})
+    clock.advance(timedelta(minutes=1))
     again = submit(me, ledger, clock, codes, queue)
-    assert again.status == "duplicate" and real_get(ORG, FARMER, "rk-1") == first
+    assert again.status == "duplicate" and ledger.responses[(ORG, FARMER, "rk-1")].answers == {}
+
+
+def test_state_machine_invalid_answer_becomes_422(me, ledger, clock, codes, queue):
+    class InvalidAnswer(Exception):
+        pass
+
+    def boom(*a, **k):
+        raise InvalidAnswer()
+
+    with pytest.raises(IntakeError) as exc:
+        submit_response(me, SURVEY_ID, payload(), ledger, clock, codes, apply_event=boom, queue=queue)
+    assert (exc.value.code, exc.value.http_status) == ("invalid_answer", 422)
+    with pytest.raises(KeyError):  # other errors are not swallowed
+        submit_response(me, SURVEY_ID, payload(), ledger, clock, codes,
+                        apply_event=lambda *a, **k: (_ for _ in ()).throw(KeyError("x")), queue=queue)
+
+
+def test_late_answer_is_stale_410(me, ledger, clock, codes, queue):
+    def stale(survey, attempt, event, clock_, codes_, **kw):
+        rec = fake_apply_event(survey, attempt, event, clock_, codes_, **kw)
+        return rec.model_copy(update={"status": "stale"})
+
+    rec = submit_response(me, SURVEY_ID, payload(), ledger, clock, codes, apply_event=stale, queue=queue)
+    assert rec.status == "stale" and success_status(rec) == 410
 
 
 @pytest.mark.parametrize("answers", [

@@ -292,7 +292,14 @@ def run_decision(identity: Identity, insight_dict: Mapping[str, Any], deps: Deci
         return DecisionResult("opted_out", decision, reasons=("opted_out_during_generation",), cost_usd=cost)
     with _Timer(deps, "ledger"):
         ledger.put_survey(org, survey, handoff.expires_at)
-        ledger.put_handoff(org, handoff)
+        try:
+            # Conditional on the OPTOUT item (ledger): an opt-out that lands after the re-check above
+            # still stops the hand-off. The survey item alone is never sent.
+            ledger.put_handoff(org, handoff)
+        except Exception as exc:
+            if type(exc).__name__ != "FarmerOptedOut":
+                raise
+            return DecisionResult("opted_out", decision, reasons=("opted_out_during_generation",), cost_usd=cost)
     return DecisionResult("survey_scheduled", decision, survey=survey, handoff=handoff,
                           reasons=reasons, cost_usd=cost)
 

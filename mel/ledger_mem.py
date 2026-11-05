@@ -3,7 +3,7 @@
 Items live in a dict keyed (pk, sk) with the same key design as the DynamoDB table:
 
     pk = ORG#<org_id>#FARMER#<farmer_id>   sk = SURVEY#<id> | HANDOFF#<id> | ATTEMPT#<survey_id>#<n>
-                                                | RESPONSE#<response_key> | CAP#<survey_id> | OPTOUT
+                                                | RESPONSE#<response_key>#<survey_id> | ANSWERED#<survey_id> | CAP#<survey_id> | OPTOUT
                                                 | FOLLOWUP#<id>
     pk = ORG#<org_id>                      sk = COUNTER#SURVEY | SURVEYOWNER#<survey_id>
 
@@ -40,6 +40,19 @@ _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 class SurveyIdConflict(Exception):
     """put_survey: this survey_id already belongs to a different farmer in the org."""
+
+
+class FarmerOptedOut(Exception):
+    """put_handoff: the farmer's OPTOUT item exists, so the hand-off was not written."""
+
+
+# Duplicate rule (outcome_codes.json duplicate_answer: "The first answer stands"). A final answer
+# (completed or negative_outcome) writes ANSWERED#<survey_id>; once it exists, any later answer
+# record for that survey (also partial) is a DUPLICATE, whatever its response_key. Partial records
+# do not write the marker, so partial then complete stays allowed. Non-answer records (delivery
+# failures, declines) are keyed by response_key only.
+FINAL_ANSWER_STATUSES = frozenset({"completed", "negative_outcome"})
+ANSWER_STATUSES = FINAL_ANSWER_STATUSES | {"partial"}
 
 
 # --------------------------------------------------------------------------- key helpers
@@ -81,6 +94,20 @@ def followup_gsi_sk(item: FollowUpItem) -> str:
 
 def attempt_sk(attempt: Attempt) -> str:
     return f"ATTEMPT#{attempt.survey_id}#{attempt.delivery_attempt}"
+
+
+def response_prefix(response_key: str) -> str:
+    """RESPONSE#<response_key>#: response keys cannot contain '#', so the prefix is unambiguous."""
+    return f"RESPONSE#{check_id('response_key', response_key)}#"
+
+
+def response_sk(record: ResponseRecord) -> str:
+    """The same response_key on two surveys is two records, not a duplicate."""
+    return response_prefix(record.response_key) + record.survey_id
+
+
+def answered_sk(survey_id: str) -> str:
+    return f"ANSWERED#{survey_id}"
 
 
 # --------------------------------------------------------------------------- implementation
@@ -126,8 +153,11 @@ class InMemoryLedger:
     # -- hand-off and attempts
 
     def put_handoff(self, org_id: str, handoff: ScheduleHandoff) -> None:
+        """Raises FarmerOptedOut instead of writing when the farmer has opted out."""
         pk = farmer_pk(org_id, handoff.survey.farmer_id)
         with self._lock:
+            if (pk, "OPTOUT") in self._items:
+                raise FarmerOptedOut
             self._items[(pk, f"HANDOFF#{handoff.handoff_id}")] = {
                 "data": dump(handoff),
                 "ttl": to_ttl(handoff.expires_at),
@@ -146,16 +176,25 @@ class InMemoryLedger:
     # -- responses
 
     def put_response(self, org_id: str, record: ResponseRecord) -> PutOutcome:
-        key = (farmer_pk(org_id, record.farmer_id), f"RESPONSE#{record.response_key}")
+        pk = farmer_pk(org_id, record.farmer_id)
+        key = (pk, response_sk(record))
+        marker = (pk, answered_sk(record.survey_id))
         with self._lock:
             if key in self._items:
                 return PutOutcome.DUPLICATE
+            if record.status in ANSWER_STATUSES and marker in self._items:
+                return PutOutcome.DUPLICATE
             self._items[key] = {"data": dump(record)}
+            if record.status in FINAL_ANSWER_STATUSES:
+                self._items[marker] = {"response_key": record.response_key}
         return PutOutcome.WRITTEN
 
     def get_response(self, org_id: str, farmer_id: str, response_key: str) -> ResponseRecord | None:
+        """The record stored under response_key (the first survey's, in sort order, if several)."""
+        pk, prefix = farmer_pk(org_id, farmer_id), response_prefix(response_key)
         with self._lock:
-            item = self._items.get((farmer_pk(org_id, farmer_id), f"RESPONSE#{response_key}"))
+            sks = sorted(sk for (item_pk, sk) in self._items if item_pk == pk and sk.startswith(prefix))
+            item = self._items[(pk, sks[0])] if sks else None
         return None if item is None else ResponseRecord.model_validate_json(item["data"])
 
     # -- frequency cap

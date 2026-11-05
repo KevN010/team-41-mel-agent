@@ -5,16 +5,15 @@ text (``raw`` inputs) is stored in the record but never written anywhere else.
 
 Public API
 ----------
-``apply_event(survey, attempt, event, clock, codes, *, existing=None) -> ResponseRecord``
+``apply_event(survey, attempt, event, clock, codes) -> ResponseRecord``
 
 ``survey``   a :class:`mel.models.Survey` or its pack dict.
 ``attempt``  a :class:`mel.models.Attempt` or a dict with the same keys. A dict may also carry
-             ``sent_at``, ``timestamps``, ``already_answered`` and ``superseded`` (see below).
+             ``sent_at``, ``timestamps`` and ``superseded`` (see below).
 ``event``    ``{kind, channel, farmer_id, at, failure_code?, answers?, raw?, input_kind?, ...}``
              ``kind`` is one of delivered, opened, answer, failure, opt_out, decline.
 ``clock``    anything with ``now()``. ``recorded_at`` is ``clock.now()``.
 ``codes``    ``pack/json/rules/outcome_codes.json`` as a dict (``mel.fixtures.load_outcome_codes()``).
-``existing`` the ledger's current record for this ``response_key``, if any.
 
 Optional event keys beyond the D contract (all ignored when absent):
 ``timestamps`` (sent/delivered/opened/answered the channel reported), ``inputs``
@@ -211,16 +210,18 @@ def _shown(ts: dict[str, datetime | None], channel: str) -> bool:
 
 
 def _arrival_code(
-    ev: dict[str, Any], att: Any, survey: Survey, existing: ResponseRecord | None, mismatch: bool, at: datetime
+    ev: dict[str, Any], att: Any, survey: Survey, mismatch: bool, at: datetime
 ) -> str | None:
-    """Why an arriving answer is not stored, if it is not. Only answers can be late or doubled."""
+    """Why an arriving answer is not stored, if it is not.
+
+    Duplicates are never decided here: the ledger does that (``put_response`` returns DUPLICATE).
+    The caller passes ``failure_code: "duplicate_answer"`` and this builds the record shape.
+    """
     found: set[str] = set()
     if ev.get("failure_code") in ARRIVAL_CODES:
         found.add(ev["failure_code"])
     if mismatch:
         found.add("identity_mismatch")
-    if ev["kind"] == "answer" and ((existing is not None and existing.answers) or _get(att, "already_answered")):
-        found.add("duplicate_answer")
     if ev["kind"] == "answer" and _get(att, "superseded"):
         found.add("survey_replaced")
     if ev["kind"] == "answer" and at > survey.send_window.not_after:
@@ -229,7 +230,7 @@ def _arrival_code(
 
 
 def _resolve_code(
-    kind: str, ev: dict[str, Any], att: Any, survey: Survey, existing: ResponseRecord | None,
+    kind: str, ev: dict[str, Any], att: Any, survey: Survey,
     mismatch: bool, at: datetime, codes: dict[str, Any],
 ) -> str | None:
     """The outcome code the event leads to. None means the answer path decides the status."""
@@ -246,7 +247,7 @@ def _resolve_code(
     if code is not None and code not in codes["failures"]:
         raise ValueError(f"unknown failure_code: {code!r}")
     # Identity beats everything: a STOP or an answer from the wrong farmer changes nothing.
-    return _arrival_code(ev, att, survey, existing, mismatch, at) or code
+    return _arrival_code(ev, att, survey, mismatch, at) or code
 
 
 def _derive_invalid_code(channel: str, input_kind: str | None) -> str:
@@ -279,8 +280,6 @@ def apply_event(
     event: dict[str, Any],
     clock: Any,
     codes: dict[str, Any],
-    *,
-    existing: ResponseRecord | None = None,
 ) -> ResponseRecord:
     """Turn one terminal event of one attempt into a ResponseRecord.
 
@@ -310,21 +309,11 @@ def apply_event(
     response_key = _get(attempt, "response_key")
     delivery_attempt = _get(attempt, "delivery_attempt")  # a transport retry keeps it; never bumped here
 
-    # Same event delivered twice by the transport: hand back what is already stored.
-    if (
-        existing is not None
-        and existing.response_key == response_key
-        and existing.delivery_attempt == delivery_attempt
-        and kind == "answer"
-        and existing.timestamps.answered == at
-    ):
-        return existing
-
     event_farmer = ev.get("farmer_id") or survey.farmer_id
     mismatch = event_farmer != survey.farmer_id
 
     # ---- which outcome code, if any
-    code = _resolve_code(kind, ev, attempt, survey, existing, mismatch, at, codes)
+    code = _resolve_code(kind, ev, attempt, survey, mismatch, at, codes)
     # A refusal carries no answers, whatever else the event holds.
     answers_in: dict[str, Any] = {} if kind in ("opt_out", "decline") else dict(ev.get("answers") or {})
 

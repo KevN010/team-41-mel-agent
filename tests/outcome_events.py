@@ -103,6 +103,8 @@ def event_from_fixture(fixture: dict[str, Any]) -> dict[str, Any]:
         "farmer_id": fixture["answered_by"] or fixture["farmer_id"],
         "at": at or fixture["recorded_at"],
         "timestamps": dict(timestamps),
+        # closed_partway or interrupted tells a partial answer set apart; null otherwise.
+        "sheet_outcome": fixture["sheet_outcome"] if fixture["status"] == "partial" else None,
     }
 
 

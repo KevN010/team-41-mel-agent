@@ -1,17 +1,15 @@
 # NOTES-D: outcome state machine
 
 ## Delivered
-- `mel/outcomes.py`: `apply_event(survey, attempt, event, clock, codes, *, existing=None) -> ResponseRecord`.
+- `mel/outcomes.py`: `apply_event(survey, attempt, event, clock, codes) -> ResponseRecord`.
   Also `update_timestamps(...)` for `delivered` and `opened`, `NonTerminalEvent`, `InvalidAnswer`.
-- `tests/test_outcomes_unit.py`: 109 tests, all pass. Every produced record is checked with `validate_against_pack(..., "response")`.
-- `tests/test_outcomes_fixtures.py` (D2): 177 of 183 pass. The 6 failures are listed below.
+- `tests/test_outcomes_unit.py`: all pass. Every produced record is checked with `validate_against_pack(..., "response")`.
+- `tests/test_outcomes_fixtures.py` (D2): 183 of 183 pass, after the one-line `sheet_outcome` pass-through in `tests/outcome_events.py` (approved by Dwayne).
+- `make test`: 555 passed. `make lint`: clean.
 
-## Fixture contradictions (D2 tests against D contract)
-- `pack/json/outcomes/{app,web}/{survey-confirm,survey-single-select,survey-scale}/sheet_interrupted.json`
-  (6 files), field `sheet_outcome`: fixture says `interrupted`, `apply_event` returns `closed_partway`.
-  The event D2 builds has no way to tell the two apart (`raw` holds the first answer, not the channel event).
-  `apply_event` reads an optional `event["sheet_outcome"]` (`closed_partway` or `interrupted`).
-  Fix is in D2's `tests/outcome_events.py`: add `"sheet_outcome": fixture["sheet_outcome"]` to the event when `failure_code` is null.
+## Fixture contradictions (resolved)
+- The 6 `sheet_interrupted` fixtures (`{app,web}/*/sheet_interrupted.json`, field `sheet_outcome`) failed because D2's event had no way to say
+  `interrupted`. `tests/outcome_events.py` now adds `sheet_outcome` for partial records. `apply_event` reads it (`closed_partway` or `interrupted`).
 - Not asserted by D2 and not reproduced from D2 events: `items[].raw_input`, `items[].input_kind` (130 items) and `raw_event` on
   `sheet_closed_partway` / `sheet_interrupted` (16 files). D2 events hold one `raw` for the whole event. `apply_event` fills
   per-item values from optional `event["inputs"] = {item_id: {raw, input_kind, attempts}}` and `raw_event` from `event["raw_event"]`.
@@ -19,12 +17,13 @@
 
 ## Event contract: what I added to the D prompt
 - Optional event keys: `timestamps`, `inputs`, `raw_event`, `sheet_outcome`, `farmerchat_reply`.
-- Optional attempt keys (dict form): `sent_at`, `timestamps`, `already_answered`, `superseded`. `Attempt` has none of these; `created_at` stands in for `sent`.
-- Keyword `existing`: the ledger's record for this `response_key`. A second answer when `existing.answers` is non-empty is `duplicate_answer`.
-  The same event applied again (same `response_key`, `delivery_attempt`, `answered` time) returns `existing` unchanged. That is the transport retry case.
+- Optional attempt keys (dict form): `sent_at`, `timestamps`, `superseded`. `already_answered` in D2 attempts is ignored. `Attempt` has none of these; `created_at` stands in for `sent`.
+- Duplicates are never decided here (Dwayne, decision 4). The ledger does: `put_response` returns DUPLICATE. The caller passes
+  `failure_code: "duplicate_answer"` and `apply_event` builds the record shape (all values discarded, status `duplicate`).
+  Without that code, applying the same event twice gives the same plain record. There is no `existing` argument.
 - `delivered` and `opened` raise `NonTerminalEvent`. They end nothing. Use `update_timestamps`.
 - Answer-arrival codes (`duplicate_answer`, `survey_closed`, `survey_replaced`, `identity_mismatch`) arrive as `kind: "answer"`. Priority:
-  identity_mismatch, duplicate_answer, survey_replaced, survey_closed. Late and duplicate are only judged for `kind: "answer"`.
+  identity_mismatch, duplicate_answer (caller-supplied), survey_replaced, survey_closed. Late and replaced are only judged for `kind: "answer"`.
   A `window_expired` event is recorded after `not_after` by design and is not stale.
 - `survey_closed` is `event.at > send_window.not_after`. An answer at exactly `not_after` is accepted.
 - `identity_mismatch` wins over every kind, so a STOP from the wrong farmer does not opt the surveyed farmer out.
@@ -52,6 +51,6 @@
 - `window_expired` on web where the sheet was opened gets `dismissed`. The pack gives no value for "open when the window closed". Guess.
 - Chat `invalid_input` sends nothing (`farmerchat_reply` null) but voice `invalid_input` sends its answers. Both are in the fixtures; the pack gives no rule.
 - `voice_call_dropped` keeps answers and counts toward the cap, but the status is `delivery_failed` and `farmerchat_reply` is null.
-- `CONTRACTS.md` lists no `existing` argument and no sheet or per-item input fields in `apply_event`. Integration should pass `existing` from `Ledger.get_response`.
+- `CONTRACTS.md` does not list the optional event keys (`sheet_outcome`, `timestamps`, `inputs`, `raw_event`). Integration should pass them from the channel layer.
+- J (draft PR #13, not read here) passes `sheet_outcome` in the event, which `apply_event` reads. J can build duplicates from `put_response` returning DUPLICATE and call `apply_event` with `failure_code: "duplicate_answer"`, or build the record itself.
 - Python: `.venv` was missing in this container. I made it with python3.12 (not committed, it is gitignored).
-- From J (draft PR #13, not read here): J passes `sheet_outcome` in the event, which `apply_event` reads. J builds the `duplicate_answer` record itself because `Attempt` has no `already_answered` field. `apply_event` can do it instead: pass `existing=` (ledger record) or `already_answered` in the attempt dict. Integration should pick one path.

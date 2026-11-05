@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from mel.fixtures import load_outcome_codes
-from mel.models import IST, Attempt, ResponseRecord, Survey
+from mel.models import IST, Attempt, Survey
 from mel.outcomes import (
     InvalidAnswer,
     NonTerminalEvent,
@@ -84,14 +84,13 @@ def ev(kind: str = "answer", channel: str = "app", **kw: Any) -> dict[str, Any]:
     return {"kind": kind, "channel": channel, "farmer_id": FARMER, "at": T_ANSWER} | kw
 
 
-def run(clock, codes, event, *, channel="app", survey=None, attempt=None, existing=None):
+def run(clock, codes, event, *, channel="app", survey=None, attempt=None):
     record = apply_event(
         survey or make_survey(),
         attempt if attempt is not None else make_attempt(channel),
         event,
         clock,
         codes,
-        existing=existing,
     )
     ok, errors = validate_against_pack(record.to_pack(), "response")
     assert ok, f"record fails the pack schema: {errors}"
@@ -266,38 +265,22 @@ def test_missing_event_farmer_is_taken_as_the_surveyed_farmer(clock, outcome_cod
 # --------------------------------------------------------------------------- duplicate, closed, replaced
 
 
-def _stored(clock, codes, answers=None, channel="app") -> ResponseRecord:
-    return run(clock, codes, ev(answers=answers or {"q1": "yes"}, channel=channel), channel=channel)
-
-
-def test_second_answer_is_duplicate_and_first_stands(clock, outcome_codes):
-    first = _stored(clock, outcome_codes)
-    later = ev(answers={"q1": "no"}, at="2026-12-16T07:27:00+05:30")
-    r = run(clock, outcome_codes, later, existing=first)
+def test_duplicate_record_is_built_only_when_the_caller_says_so(clock, outcome_codes):
+    # The ledger decides duplicates (put_response returns DUPLICATE). apply_event only shapes the record.
+    event = ev(answers={"q1": "no"}, at="2026-12-16T07:27:00+05:30", failure_code="duplicate_answer")
+    r = run(clock, outcome_codes, event)
     assert (r.status, r.failure_code) == ("duplicate", "duplicate_answer")
     assert r.answers == {}
     assert r.items[0].result == "discarded"
     assert (r.retry_decision, r.counts_toward_cap) == ("none", False)
     assert r.farmerchat_reply.model_dump() == {"http_status": 200, "outcome": "duplicate"}
-    assert first.answers == {"q1": "yes"}  # the stored record is untouched
 
 
-def test_already_answered_flag_on_the_attempt_also_means_duplicate(clock, outcome_codes):
-    r = run(clock, outcome_codes, ev(answers={"q1": "yes"}), attempt=make_attempt("app", already_answered=True))
-    assert r.failure_code == "duplicate_answer"
-
-
-def test_same_event_replayed_returns_the_stored_record(clock, outcome_codes):
-    first = _stored(clock, outcome_codes)
-    again = apply_event(make_survey(), make_attempt("app"), ev(answers={"q1": "yes"}), clock, outcome_codes, existing=first)
-    assert again is first
-
-
-def test_existing_record_without_answers_does_not_make_a_duplicate(clock, outcome_codes):
-    expired = run(clock, outcome_codes, ev("failure", failure_code="push_not_opened"))
-    assert expired.answers == {}
-    r = run(clock, outcome_codes, ev(answers=ALL3), existing=expired)
-    assert r.status == "completed"
+def test_apply_event_never_decides_a_duplicate_itself(clock, outcome_codes):
+    # Same attempt, same key, applied twice: both come out as plain answers. No state, no duplicate.
+    a = run(clock, outcome_codes, ev(answers={"q1": "yes"}))
+    b = run(clock, outcome_codes, ev(answers={"q1": "yes"}), attempt=make_attempt("app", already_answered=True))
+    assert a == b and a.status == "partial"
 
 
 def test_answer_after_window_is_stale_survey_closed(clock, outcome_codes):
@@ -319,14 +302,13 @@ def test_replaced_survey_is_stale_survey_replaced(clock, outcome_codes):
     assert r.farmerchat_reply.model_dump() == {"http_status": 404, "outcome": "unknown_flow"}
 
 
-def test_priority_identity_then_duplicate_then_replaced_then_closed(clock, outcome_codes):
+def test_priority_identity_then_replaced_then_closed(clock, outcome_codes):
     late = "2026-12-19T09:00:00+05:30"
-    attempt = make_attempt("app", already_answered=True, superseded=True)
-    both = run(clock, outcome_codes, ev(answers={"q1": "yes"}, at=late), attempt=attempt)
-    assert both.failure_code == "duplicate_answer"
     replaced = run(clock, outcome_codes, ev(answers={"q1": "yes"}, at=late), attempt=make_attempt("app", superseded=True))
     assert replaced.failure_code == "survey_replaced"
-    wrong = run(clock, outcome_codes, ev(answers={"q1": "yes"}, at=late, farmer_id=OTHER), attempt=attempt)
+    closed = run(clock, outcome_codes, ev(answers={"q1": "yes"}, at=late))
+    assert closed.failure_code == "survey_closed"
+    wrong = run(clock, outcome_codes, ev(answers={"q1": "yes"}, at=late, farmer_id=OTHER), attempt=make_attempt("app", superseded=True))
     assert wrong.failure_code == "identity_mismatch"
 
 

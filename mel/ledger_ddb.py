@@ -3,8 +3,8 @@
 Key design (same as mel/ledger_mem.py):
 
     pk = ORG#<org_id>#FARMER#<farmer_id>
-         sk = SURVEY#<id> | HANDOFF#<id> | ATTEMPT#<survey_id>#<n> | RESPONSE#<response_key>
-              | CAP#<survey_id> | OPTOUT | FOLLOWUP#<id>
+         sk = SURVEY#<id> | HANDOFF#<id> | ATTEMPT#<survey_id>#<n> | RESPONSE#<response_key>#<survey_id>
+              | ANSWERED#<survey_id> | CAP#<survey_id> | OPTOUT | FOLLOWUP#<id>
     pk = ORG#<org_id>
          sk = COUNTER#SURVEY (atomic ADD)  |  SURVEYOWNER#<survey_id> (farmer_id, for identity_mismatch)
     GSI1: gsi1pk = ORG#<org_id>, gsi1sk = FOLLOWUP#<created_at>#<id>   (list_follow_ups)
@@ -14,9 +14,10 @@ Every key starts with ORG#<org_id>, and org_id/farmer_id may not contain '#', so
 write another org's items. Records are stored as one JSON string attribute ``data`` (to_pack()), which
 avoids DynamoDB's float/Decimal rules and round-trips exactly.
 
-Conditional writes: put_response and record_cap use attribute_not_exists(sk); put_attempt is a
-transact_write with a ConditionCheck on the farmer's OPTOUT item, so an opt-out cannot slip between
-the check and the write. Nothing here logs record content.
+Conditional writes: put_response and record_cap use attribute_not_exists(sk); a final answer also
+writes ANSWERED#<survey_id> in the same transaction, and a partial checks it (duplicate rule in
+mel/ledger_mem.py). put_attempt and put_handoff are transact_writes with a ConditionCheck on the
+farmer's OPTOUT item, so an opt-out cannot slip between the check and the write. Nothing here logs record content.
 """
 
 from __future__ import annotations
@@ -29,13 +30,19 @@ import boto3
 from botocore.exceptions import ClientError
 
 from mel.ledger_mem import (
+    ANSWER_STATUSES,
     ATTEMPT_FALLBACK_TTL,
+    FINAL_ANSWER_STATUSES,
+    FarmerOptedOut,
     SurveyIdConflict,
+    answered_sk,
     attempt_sk,
     dump,
     farmer_pk,
     followup_gsi_sk,
     org_pk,
+    response_prefix,
+    response_sk,
     to_micros,
     to_ttl,
 )
@@ -61,6 +68,12 @@ def _first_condition_failed(exc: ClientError) -> bool:
         return False
     reasons = exc.response.get("CancellationReasons") or []
     return bool(reasons) and reasons[0].get("Code") == _REASON_COND_FAILED
+
+
+def _any_condition_failed(exc: ClientError) -> bool:
+    if exc.response.get("Error", {}).get("Code") != _TX_CANCELED:
+        return False
+    return any(r.get("Code") == _REASON_COND_FAILED for r in exc.response.get("CancellationReasons") or [])
 
 
 def _is_condition_failure(exc: ClientError) -> bool:
@@ -135,15 +148,35 @@ class DynamoLedger:
     # -- hand-off and attempts
 
     def put_handoff(self, org_id: str, handoff: ScheduleHandoff) -> None:
-        self._ddb.put_item(
-            TableName=self._table,
-            Item={
-                "pk": farmer_pk(org_id, handoff.survey.farmer_id),
-                "sk": f"HANDOFF#{handoff.handoff_id}",
-                "data": dump(handoff),
-                "ttl": to_ttl(handoff.expires_at),
-            },
-        )
+        """Raises FarmerOptedOut instead of writing when the farmer's OPTOUT item exists."""
+        pk = farmer_pk(org_id, handoff.survey.farmer_id)
+        try:
+            self._ddb.transact_write_items(
+                TransactItems=[
+                    {
+                        "ConditionCheck": {
+                            "TableName": self._table,
+                            "Key": {"pk": pk, "sk": "OPTOUT"},
+                            "ConditionExpression": "attribute_not_exists(sk)",
+                        }
+                    },
+                    {
+                        "Put": {
+                            "TableName": self._table,
+                            "Item": {
+                                "pk": pk,
+                                "sk": f"HANDOFF#{handoff.handoff_id}",
+                                "data": dump(handoff),
+                                "ttl": to_ttl(handoff.expires_at),
+                            },
+                        }
+                    },
+                ]
+            )
+        except ClientError as exc:
+            if _first_condition_failed(exc):
+                raise FarmerOptedOut from None
+            raise
 
     def put_attempt(self, org_id: str, attempt: Attempt) -> PutOutcome:
         pk = farmer_pk(org_id, attempt.farmer_id)
@@ -176,25 +209,45 @@ class DynamoLedger:
     # -- responses
 
     def put_response(self, org_id: str, record: ResponseRecord) -> PutOutcome:
+        pk = farmer_pk(org_id, record.farmer_id)
+        put = {
+            "Put": {
+                "TableName": self._table,
+                "Item": {"pk": pk, "sk": response_sk(record), "data": dump(record)},
+                "ConditionExpression": "attribute_not_exists(sk)",
+            }
+        }
+        marker_key = {"pk": pk, "sk": answered_sk(record.survey_id)}
+        if record.status in FINAL_ANSWER_STATUSES:
+            marker = {"Put": {"TableName": self._table, "Item": {**marker_key, "response_key": record.response_key},
+                              "ConditionExpression": "attribute_not_exists(sk)"}}
+        elif record.status in ANSWER_STATUSES:
+            marker = {"ConditionCheck": {"TableName": self._table, "Key": marker_key,
+                                         "ConditionExpression": "attribute_not_exists(sk)"}}
+        else:
+            marker = None
         try:
-            self._ddb.put_item(
-                TableName=self._table,
-                Item={
-                    "pk": farmer_pk(org_id, record.farmer_id),
-                    "sk": f"RESPONSE#{record.response_key}",
-                    "data": dump(record),
-                },
-                ConditionExpression="attribute_not_exists(sk)",
-            )
+            if marker is None:
+                self._ddb.put_item(**put["Put"])
+            else:
+                self._ddb.transact_write_items(TransactItems=[put, marker])
         except ClientError as exc:
-            if _is_condition_failure(exc):
+            if _is_condition_failure(exc) or _any_condition_failed(exc):
                 return PutOutcome.DUPLICATE
             raise
         return PutOutcome.WRITTEN
 
     def get_response(self, org_id: str, farmer_id: str, response_key: str) -> ResponseRecord | None:
-        item = self._get(farmer_pk(org_id, farmer_id), f"RESPONSE#{response_key}")
-        return None if item is None else ResponseRecord.model_validate_json(item["data"])
+        """The record stored under response_key (the first survey's, in sort order, if several)."""
+        resp = self._ddb.query(
+            TableName=self._table,
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :p)",
+            ExpressionAttributeValues={":pk": farmer_pk(org_id, farmer_id), ":p": response_prefix(response_key)},
+            ConsistentRead=True,
+            Limit=1,
+        )
+        items = resp.get("Items") or []
+        return None if not items else ResponseRecord.model_validate_json(items[0]["data"])
 
     # -- frequency cap
 

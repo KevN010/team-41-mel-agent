@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 RETRYABLE_STATUS = {429, 500, 502, 503, 504, 529}
 ALLOWED_HOSTS = {"api.typesafe.ai"}  # the bearer key is only ever sent here
+DEFAULT_MODEL = "jev-1.14.0"  # System One needs a `model` field; the JEV_MODEL env var overrides this
 MAX_RETRIES = 2  # 1 try + 2 retries
 DEADLINE_S = 6.0  # total time including retries; a Jev outage costs seconds, not minutes
 MAX_RETRY_DELAY_S = 2.0
@@ -211,7 +212,7 @@ class JevJudge:
         missing = [check for check in JEV_CHECKS if check not in self._thresholds]
         if missing:
             raise ValueError(f"missing thresholds: {missing}")
-        self._model = model if model is not None else (os.environ.get("JEV_MODEL") or None)
+        self._model = model if model is not None else (os.environ.get("JEV_MODEL") or DEFAULT_MODEL)
         self._attempts = 1 + max(int(max_retries), 0)
         self._deadline_s = deadline_s
         self._transport = transport  # tests pass httpx.MockTransport; None = real network

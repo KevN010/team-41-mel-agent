@@ -32,6 +32,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 ROOT = Path(__file__).resolve().parent.parent
 # The package may be installed editable from another checkout; always use this one.
 sys.path.insert(0, str(ROOT))
@@ -213,27 +215,63 @@ class TimedJudge:
 
 class RecordingClient:
     """Wraps the bedrock-runtime client and keeps the raw usage and stop reason of every response,
-    failed parses included. The provider drops usage when it raises, so spend would be understated."""
+    failed parses included. The provider drops usage when it raises, so spend would be understated.
+    A call that raised before any response is recorded with ``error`` and no usage."""
 
     def __init__(self, inner: Any) -> None:
         self._inner, self.calls = inner, []
 
     def converse(self, **request: Any) -> Any:
         t0 = time.perf_counter()
-        response = self._inner.converse(**request)
+        try:
+            response = self._inner.converse(**request)
+        except Exception as exc:
+            code = getattr(exc, "response", {}).get("Error", {}).get("Code", type(exc).__name__)
+            self.calls.append({"latency_ms": round((time.perf_counter() - t0) * 1000),
+                               "stop_reason": None, "usage": {}, "error": str(code)})
+            raise
         self.calls.append({"latency_ms": round((time.perf_counter() - t0) * 1000),
                            "stop_reason": response.get("stopReason"), "usage": dict(response.get("usage") or {})})
         return response
 
 
-def _call_row(call: dict[str, Any], price_in: float | None, price_out: float | None) -> dict[str, Any]:
+class RecordingTransport(httpx.BaseTransport):
+    """httpx transport wrapper that keeps status and body of every non-2xx Jev response (body capped)."""
+
+    BODY_CAP = 2000
+
+    def __init__(self) -> None:
+        self._inner, self.errors = httpx.HTTPTransport(), []
+
+    def handle_request(self, request: Any) -> Any:
+        response = self._inner.handle_request(request)
+        if not 200 <= response.status_code < 300:
+            response.read()
+            body = response.text[: self.BODY_CAP]
+            if not any(e["status"] == response.status_code and e["body"] == body for e in self.errors):
+                self.errors.append({"status": response.status_code, "body": body})
+        return response
+
+    def close(self) -> None:  # JevJudge closes its httpx client after every post; keep the pool open
+        pass
+
+
+def _call_row(call: dict[str, Any], price_in: float | None, price_out: float | None,
+              est_input: int | None = None) -> dict[str, Any]:
+    """Token counts from the raw Converse usage block. Input = totalTokens - outputTokens, so cached prompt
+    tokens count. A call that raised before any response has no usage: it is counted at ``est_input``
+    (median input tokens of the metered calls), no output, and flagged ``estimated``."""
     u = call["usage"]
+    estimated = bool(call.get("error")) or not u
     out = int(u.get("outputTokens", 0))
     cached = int(u.get("cacheReadInputTokens", 0)) + int(u.get("cacheWriteInputTokens", 0))
-    # totalTokens covers every input token, cached or not; inputTokens alone is only the uncached part.
-    total_in = int(u["totalTokens"]) - out if "totalTokens" in u else int(u.get("inputTokens", 0)) + cached
+    if estimated:
+        total_in = est_input or 0
+    else:
+        total_in = int(u["totalTokens"]) - out if "totalTokens" in u else int(u.get("inputTokens", 0)) + cached
     cost = None if price_in is None or price_out is None else (total_in * price_in + out * price_out) / 1_000_000
-    return {"latency_ms": call["latency_ms"], "stop_reason": call["stop_reason"], "input_tokens": total_in,
+    return {"latency_ms": call["latency_ms"], "stop_reason": call["stop_reason"], "error": call.get("error"),
+            "estimated": estimated, "input_tokens": total_in,
             "uncached_input_tokens": int(u.get("inputTokens", 0)), "output_tokens": out, "cost_usd": cost}
 
 
@@ -249,7 +287,8 @@ def eval_generation() -> dict[str, Any]:
     clock, rules, calendar = _clock(), pack.load_rules(), pack.load_crop_calendar()
     choice = load_model_choice()
     key, key_status = fetch_jev_key()
-    judge = TimedJudge(JevJudge(api_key=key))
+    transport = RecordingTransport()
+    judge = TimedJudge(JevJudge(api_key=key, transport=transport))
     chats: dict[str, BedrockChat] = {}
     recorder = RecordingClient(_default_client(REGION))
 
@@ -277,7 +316,10 @@ def eval_generation() -> dict[str, Any]:
         verdict = res.verdict
         judge_call = judge.calls[n_judge] if len(judge.calls) > n_judge else None
         spec = next(iter(chats.values())).spec
-        calls = [_call_row(c, spec.input_per_m, spec.output_per_m) for c in recorder.calls[n_calls:]]
+        metered = sorted(int(c["usage"]["totalTokens"]) - int(c["usage"].get("outputTokens", 0))
+                         for c in recorder.calls if c["usage"].get("totalTokens"))
+        est_input = metered[len(metered) // 2] if metered else None
+        calls = [_call_row(c, spec.input_per_m, spec.output_per_m, est_input) for c in recorder.calls[n_calls:]]
         rows.append({
             "scenario": sc["name"],
             "status": res.status,
@@ -302,10 +344,25 @@ def eval_generation() -> dict[str, Any]:
         else "ok" if r["jev"]["ok"] else "not_ok"
         for r in ran
     )
-    total_cost = sum(r["cost_usd"] for r in ran)
-    in_tok = sum(c["input_tokens"] for r in ran for c in r["calls"])
-    out_tok = sum(c["output_tokens"] for r in ran for c in r["calls"])
-    spec = next(iter(chats.values())).spec if chats else None
+    # A call is "used" when it produced the survey that went to Jev; every other call is a failed call.
+    used_calls: list[dict[str, Any]] = []
+    failed_calls: list[dict[str, Any]] = []
+    for r in ran:
+        if r["status"] == "failed_review":
+            failed_calls.extend(r["calls"])
+        else:
+            failed_calls.extend(r["calls"][:-1])
+            used_calls.extend(r["calls"][-1:])
+    all_calls = used_calls + failed_calls
+
+    def tok(calls: list[dict[str, Any]], field: str) -> int:
+        return sum(c[field] for c in calls)
+
+    def cost(calls: list[dict[str, Any]]) -> float:
+        return sum(c["cost_usd"] or 0.0 for c in calls)
+
+    total_cost, spec = cost(all_calls), (next(iter(chats.values())).spec if chats else None)
+    n_acc = len(accepted)
     return {
         "model": {"generation": choice.generation, "retry": choice.retry,
                   "price_input_per_m": getattr(spec, "input_per_m", None),
@@ -313,19 +370,27 @@ def eval_generation() -> dict[str, Any]:
                   "price_verified": False},
         "language": SCENARIO_LANGUAGE,
         "jev_key_status": key_status,
+        "jev": {"model": getattr(judge.inner, "_model", None), "http_errors": transport.errors},
         "scenarios": rows,
         "summary": {
             "scenarios_run": len(ran),
             "schema_valid": sum(r["schema_valid"] for r in ran),
-            "accepted": len(accepted),
+            "accepted": n_acc,
             "jev_verdicts": dict(jev_counts),
             "model_calls": len(latencies),
+            "unmetered_calls_estimated": sum(1 for c in all_calls if c["estimated"]),
             "latency_ms_p50": percentile(latencies, 50),
             "latency_ms_p95": percentile(latencies, 95),
-            "input_tokens": in_tok,
-            "output_tokens": out_tok,
+            "input_tokens": tok(all_calls, "input_tokens"),
+            "output_tokens": tok(all_calls, "output_tokens"),
+            "failed_call_count": len(failed_calls),
+            "failed_input_tokens": tok(failed_calls, "input_tokens"),
+            "failed_output_tokens": tok(failed_calls, "output_tokens"),
+            "failed_calls_cost_usd": cost(failed_calls),
+            "used_calls_cost_usd": cost(used_calls),
             "total_cost_usd": total_cost,
-            "cost_per_accepted_survey_usd": (total_cost / len(accepted)) if accepted else None,
+            "cost_per_accepted_survey_usd": (total_cost / n_acc) if n_acc else None,
+            "cost_per_accepted_survey_used_calls_only_usd": (cost(used_calls) / n_acc) if n_acc else None,
             "cost_per_generated_survey_usd": (total_cost / len(ran)) if ran else None,
         },
     }
@@ -496,9 +561,18 @@ def build_report(res: dict[str, Any], inventory: dict[str, Any] | None) -> str:
         w("| Jev verdicts | " + (", ".join(f"{k}: {v}" for k, v in sorted(s["jev_verdicts"].items())) or "none") + " |")
         w(f"| Model calls | {s['model_calls']} |")
         w(f"| Latency p50 / p95 per model call | {_fmt_ms(s['latency_ms_p50'])} / {_fmt_ms(s['latency_ms_p95'])} |")
-        w(f"| Tokens in / out (total) | {s['input_tokens']:,} / {s['output_tokens']:,} |")
-        cpa = s["cost_per_accepted_survey_usd"]
-        w(f"| Cost per accepted survey | {_fmt_usd(cpa) if cpa is not None else 'n/a (0 accepted)'} |")
+        w(f"| Tokens in / out, all calls | {s['input_tokens']:,} / {s['output_tokens']:,} |")
+        w(f"| Of which failed calls ({s['failed_call_count']}) in / out | "
+          f"{s['failed_input_tokens']:,} / {s['failed_output_tokens']:,} ({_fmt_usd(s['failed_calls_cost_usd'])}) |")
+        cpa, cpu = s["cost_per_accepted_survey_usd"], s["cost_per_accepted_survey_used_calls_only_usd"]
+        none = "n/a (0 accepted)"
+        w(f"| Cost per accepted survey, failed calls counted | {_fmt_usd(cpa) if cpa is not None else none} |")
+        w(f"| Cost per accepted survey, successful calls only | {_fmt_usd(cpu) if cpu is not None else none} |")
+        jevd = g["jev"]
+        verdicts = s["jev_verdicts"]
+        jev_up = verdicts.get("ok", 0) + verdicts.get("not_ok", 0) > 0
+        w(f"| Jev | {'available' if jev_up else 'UNAVAILABLE'}; model `{jevd['model']}`; verdicts "
+          + (", ".join(f"{k}: {v}" for k, v in sorted(verdicts.items())) or "none") + " |")
         w(f"| Cost per generated survey | {_fmt_usd(s['cost_per_generated_survey_usd'])} |")
         w(f"| Total spend of this run (Bedrock) | {_fmt_usd(s['total_cost_usd'])} |")
         w("")
@@ -531,6 +605,12 @@ def build_report(res: dict[str, Any], inventory: dict[str, Any] | None) -> str:
                 stops = ", ".join(str(c.get("stop_reason")) for c in r["calls"]) or "no response"
                 findings.append(f"{r['scenario']}: failed review after {r['attempts']} attempts "
                                 f"({'; '.join(r['reasons'])}). Stop reasons of the metered responses: {stops}.")
+        for e in g["jev"]["http_errors"]:
+            findings.append(f"Jev HTTP {e['status']}, exact response body (capped at 2,000 characters): "
+                            f"`{e['body']}`")
+        if s["unmetered_calls_estimated"]:
+            findings.append(f"{s['unmetered_calls_estimated']} call(s) raised before any response; they are counted "
+                            "at the median input tokens of the metered calls and no output (estimate).")
         findings.append("Token counts are all input tokens per call (Converse `totalTokens` minus output), cached "
                         "or not; spend covers every response received, failed parses included. A call that raised "
                         "before any response carries no usage and is not metered.")

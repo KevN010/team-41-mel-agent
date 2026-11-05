@@ -134,15 +134,41 @@ def test_untrusted_text_only_in_state_never_in_questions(insight, survey):
     assert insight.advice_summary in json.dumps(state)
 
 
-def test_model_field_only_when_configured(insight, survey):
+def test_model_defaults_to_jev_1_14_0_and_can_be_overridden(insight, survey, monkeypatch):
+    monkeypatch.delenv("JEV_MODEL", raising=False)
     fake = FakeJev(ok_response())
     judge, _ = make_judge(fake)
     judge.check_survey(insight, survey)
-    assert "model" not in json.loads(fake.requests[0].content)
+    assert json.loads(fake.requests[0].content)["model"] == "jev-1.14.0"
+    monkeypatch.setenv("JEV_MODEL", "from-env")
+    fake = FakeJev(ok_response())
+    judge, _ = make_judge(fake)
+    judge.check_survey(insight, survey)
+    assert json.loads(fake.requests[0].content)["model"] == "from-env"
     fake = FakeJev(ok_response())
     judge, _ = make_judge(fake, model="system-one-x")
     judge.check_survey(insight, survey)
     assert json.loads(fake.requests[0].content)["model"] == "system-one-x"
+
+
+def test_request_body_matches_the_working_system_one_shape(insight, survey, monkeypatch):
+    """Offline guard for the 422 seen in the live run: POST .../v1/systemone, bearer header, and a body of
+    exactly model + state + questions, with questions a dict keyed by check name and every question typed noul."""
+    monkeypatch.delenv("JEV_MODEL", raising=False)
+    fake = FakeJev(ok_response())
+    judge, _ = make_judge(fake, url="https://api.typesafe.ai/v1/systemone")
+    judge.check_survey(insight, survey)
+    request = fake.requests[0]
+    assert request.method == "POST" and str(request.url) == "https://api.typesafe.ai/v1/systemone"
+    assert request.headers["authorization"] == f"Bearer {KEY}"
+    body = json.loads(request.content)
+    assert set(body) == {"model", "state", "questions"}
+    assert body["model"] == "jev-1.14.0"
+    assert isinstance(body["state"], dict)
+    assert isinstance(body["questions"], dict) and list(body["questions"]) == list(JEV_CHECKS)
+    for name, question in body["questions"].items():
+        assert question["type"] == "noul", name
+        assert isinstance(question["instructions"], str) and question["instructions"], name
 
 
 # --------------------------------------------------------------------------- thresholds

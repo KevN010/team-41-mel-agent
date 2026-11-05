@@ -10,8 +10,10 @@ tokens, cost), the DynamoDB items for the run, and the SQS follow-up message.
 Each run uses a fresh org id (org.e2e-<stamp>) so the frequency cap and survey counter of earlier
 runs do not interfere. Nothing secret is read or printed. Insight text is sent to the runtime only.
 
-    infra/.venv/bin/python scripts/e2e_run.py [--name e2e-run-1]
-    infra/.venv/bin/python scripts/e2e_run.py --restart-check S-00001 --org org.e2e-... --name restart
+    .venv/bin/python scripts/e2e_run.py [--name e2e-run-1]
+    .venv/bin/python scripts/e2e_run.py --restart-check S-00001 --org org.e2e-... --name restart
+    .venv/bin/python scripts/e2e_run.py --set-clock 2027-01-08T10:00:00+05:30   # live simulator demo
+    .venv/bin/python scripts/e2e_run.py --set-clock reset
 """
 
 from __future__ import annotations
@@ -30,8 +32,8 @@ import boto3
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from mel.fixtures import load_scenarios  # noqa: E402
-from mel.ledger_mem import farmer_pk, org_pk  # noqa: E402
+from mel.fixtures import load_scenarios
+from mel.ledger_mem import farmer_pk, org_pk
 
 REGION = "us-west-2"
 API_URL = "https://ib6pvb874g.execute-api.us-west-2.amazonaws.com"
@@ -178,12 +180,55 @@ def restart_check(name: str, org: str, farmer: str, survey_id: str) -> dict[str,
     control = boto3.client("bedrock-agentcore-control", region_name=REGION)
     runtime = control.get_agent_runtime(agentRuntimeId=arn.rsplit("/", 1)[-1])
     rt = Runtime(arn, f"mel-restart-{secrets.token_hex(12)}")
-    got = rt.call("get_survey", {"farmer_id": farmer, "org_id": org}, {"survey_id": survey_id})
+    rt.call("get_survey", {"farmer_id": farmer, "org_id": org}, {"survey_id": survey_id})
     return {"name": name, "org_id": org, "runtime_arn": arn,
             "runtime_version": runtime.get("agentRuntimeVersion"),
             "runtime_updated": str(runtime.get("lastUpdatedAt")),
             "container": (runtime.get("agentRuntimeArtifact") or {}).get("containerConfiguration", {}).get("containerUri"),
             "calls": rt.calls}
+
+
+def _fence(obj: Any) -> str:
+    return "```json\n" + json.dumps(obj, indent=2, default=_jsonable) + "\n```"
+
+
+def render(result: dict[str, Any]) -> str:
+    calls = result["calls"]
+    lines = [f"# {result['name']}", ""]
+    if "runtime_version" in result:
+        lines += [
+            "Restart check: the AgentCore Runtime was redeployed (new version), then the survey written by",
+            "the e2e run was read back through the new deployment.", "",
+            f"- Runtime: `{result['runtime_arn']}`",
+            f"- Runtime version after redeploy: `{result['runtime_version']}`, updated `{result['runtime_updated']}`",
+            f"- Container: `{result['container']}`",
+            f"- Org: `{result['org_id']}`", "",
+        ]
+    else:
+        lines += [
+            "Real run against the deployed stack in us-west-2 (account 423964648384), through the AgentCore",
+            "Runtime with IAM SigV4. Scenario 3 (potato) and scenario 6 (no survey).", "",
+            f"- Runtime: `{result['runtime_arn']}`",
+            f"- DynamoDB table: `{result['table']}`",
+            f"- Org (fresh per run): `{result['org_id']}`",
+            f"- Survey: `{result.get('survey_id')}`", "",
+        ]
+    lines += ["## Calls", "", "| action | farmer | status | latency ms | runtime session | trace id sent (X-Ray format) |",
+              "|---|---|---|---|---|---|"]
+    for c in calls:
+        lines.append(f"| {c['action']} | {c['farmer_id']} | {c['status']} | {c['latency_ms']} | "
+                     f"`{c['runtime_session_id']}` | `{c['trace_id_sent']}` |")
+    lines.append("")
+    for c in calls:
+        lines += [f"### {c['action']} ({c['status']})", "", _fence(c["body"]), ""]
+    if "logs" in result:
+        keep = [{k: v for k, v in entry.items() if k != "stream"} for entry in result["logs"]
+                if entry.get("msg") != "metric"]
+        lines += ["## CloudWatch log lines (runtime log group, mel.* loggers, metric lines left out)", "",
+                  _fence(keep), "", "## DynamoDB items for the run", "", _fence(result["dynamodb"]), "",
+                  "## SQS follow-up message (mel-followups, read with VisibilityTimeout 0, not deleted)", "",
+                  _fence(result["sqs"]), ""]
+    return "\n".join(lines)
 
 
 def main() -> None:
@@ -192,16 +237,30 @@ def main() -> None:
     ap.add_argument("--restart-check", metavar="SURVEY_ID")
     ap.add_argument("--org")
     ap.add_argument("--farmer", default="F-000245")
+    ap.add_argument("--render-only", action="store_true", help="rewrite <name>.md from <name>.json")
+    ap.add_argument("--set-clock", metavar="ISO|reset",
+                    help="only move the server demo clock of --org (default org.farmerchat) and exit")
     a = ap.parse_args()
+    if a.set_clock:
+        rt = Runtime(ssm("agent_runtime_arn"), f"mel-clock-{secrets.token_hex(12)}")
+        op = {"op": "reset"} if a.set_clock == "reset" else {"op": "set", "at": a.set_clock}
+        out = rt.call("clock", {"farmer_id": a.farmer, "org_id": a.org or "org.farmerchat"}, op)
+        print(json.dumps(out["body"]))
+        return
     out_dir = ROOT / "evidence"
     out_dir.mkdir(exist_ok=True)
+    if a.render_only:
+        result = json.loads((out_dir / f"{a.name}.json").read_text())
+        (out_dir / f"{a.name}.md").write_text(render(result))
+        return
     if a.restart_check:
         result = restart_check(a.name, a.org, a.farmer, a.restart_check)
     else:
         result = run(a.name)
     path = out_dir / f"{a.name}.json"
     path.write_text(json.dumps(result, indent=2, default=_jsonable))
-    print(f"wrote {path.relative_to(ROOT)}")
+    (out_dir / f"{a.name}.md").write_text(render(result))
+    print(f"wrote {path.relative_to(ROOT)} and .md")
 
 
 if __name__ == "__main__":

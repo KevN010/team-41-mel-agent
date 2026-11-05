@@ -32,8 +32,8 @@ Shapes follow `mel/api/intake.py` and `mel/api/decide.py` from PR #13 (branch of
 |---|---|---|
 | decide | `POST /surveys/decide` | the insight JSON itself. `farmer_id` is set to the token's `custom:farmer_id` (else the server answers 403 `identity_mismatch`) |
 | answer | `POST /surveys/{survey_id}/responses` | `response_key, channel, answers, delivery_attempt`, plus `sheet_outcome` (app, web only) and `input_kind` when set |
-| failure, decline, opt-out | `POST /surveys/{survey_id}/events` | `response_key, channel, delivery_attempt, kind, failure_code`, plus `sheet_outcome`. **No such route exists in J's code. See NOTES-L.md.** |
-| follow-ups | `GET /follow-ups` | none. The ledger has `list_follow_ups`, but J has no route for it. |
+| failure, decline, opt-out | `POST /surveys/{survey_id}/responses` (same route as answers) | `response_key, channel, delivery_attempt, kind, failure_code`, plus `sheet_outcome`. The server sends a body with `kind` to `mel/api/events.py` |
+| follow-ups | `GET /follow-ups` | none. Returns `{items: [...]}`, the signed-in farmer's items only |
 
 The answer body has only the keys `ResponsePayload` allows (it forbids all others, so identity keys would be a 400).
 Every call sends `Authorization: Bearer <ID token>`. The page never sends `farmer_id` or `org_id` as a body field of its own.
@@ -53,6 +53,15 @@ REPLAY records are not server records. The page says so on every record.
 
 - hi-IN rendering. The embedded data is en-IN only.
 - Real delivery. Nothing is sent to WhatsApp, Telegram, push or phone.
+
+## Deployed stack
+
+The page is served at https://d3eb8n1ufruyva.cloudfront.net and is prefilled with the deployed API URL,
+user pool and app client (URL parameters still override them). Users are the seeded `farmer1..farmer5`.
+
+The server has its own demo clock per org, separate from the page's virtual clock. To put the server
+inside a scenario window for a LIVE demo, the operator runs
+`.venv/bin/python scripts/e2e_run.py --set-clock 2027-01-08T10:00:00+05:30` (and `--set-clock reset` after).
 
 ## Needed on the AWS side
 

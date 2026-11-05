@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mel-agent pitch</title>
+<style>
+:root{
+  --paper:#F3EEE3;   /* background */
+  --ink:#1D2420;     /* text */
+  --leaf:#2E6B3F;    /* request path, primary accent */
+  --river:#2F5E86;   /* data path */
+  --amber:#C7860A;   /* pending, warning, timer */
+  --muted:color-mix(in srgb,var(--ink) 58%,var(--paper));
+  --faint:color-mix(in srgb,var(--ink) 14%,var(--paper));
+  --wash:color-mix(in srgb,var(--ink) 6%,var(--paper));
+  --display:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Kohinoor Devanagari","Nirmala UI",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#111613;overflow:hidden}
+body{font-family:var(--body);color:var(--ink);font-variant-numeric:tabular-nums}
+#viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;background:var(--paper);transform-origin:0 0;overflow:hidden}
+.slide{position:absolute;inset:0;padding:84px 112px 96px;display:none}
+.slide.active{display:block}
+.kicker{font-size:22px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.kicker b{color:var(--leaf)}
+h1{font-family:var(--display);font-weight:600;font-size:68px;line-height:1.06;letter-spacing:-.01em;margin-top:14px;max-width:1420px}
+p{line-height:1.4}
+.star{position:absolute;top:72px;right:112px;display:flex;gap:6px;font-family:var(--display);font-size:30px;font-weight:700}
+.star span{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--faint)}
+.star span.on{color:var(--paper);background:var(--ink)}
+.chip{display:inline-flex;align-items:baseline;gap:8px;padding:3px 12px 4px;border-radius:999px;background:color-mix(in srgb,var(--amber) 22%,var(--paper));border:2px solid var(--amber);color:var(--ink);font-family:var(--body);font-size:.62em;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;vertical-align:middle;line-height:1.2}
+.chip i{font-style:normal;font-weight:500;text-transform:none;letter-spacing:0;color:color-mix(in srgb,var(--ink) 75%,var(--amber))}
+.src{font-size:17px;color:var(--muted)}
+.hint{position:absolute;left:112px;bottom:40px;font-size:18px;color:var(--muted)}
+.hint kbd{font-family:var(--body);font-size:16px;border:1.5px solid var(--faint);border-radius:5px;padding:1px 7px;margin:0 2px;color:var(--ink)}
+
+/* chrome */
+#progress{position:absolute;left:0;bottom:0;height:8px;background:var(--leaf);width:0;transition:width .35s ease;z-index:5}
+#timer{position:absolute;right:112px;bottom:30px;font-size:24px;font-weight:700;color:var(--muted);z-index:5;padding:4px 12px;border-radius:6px}
+#timer.warn{color:var(--ink);background:color-mix(in srgb,var(--amber) 35%,var(--paper))}
+#notes{position:absolute;left:0;right:0;bottom:0;height:500px;background:var(--ink);color:var(--paper);padding:36px 112px 48px;z-index:10;display:none;overflow:hidden}
+#notes.show{display:block}
+#notes h3{font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:color-mix(in srgb,var(--paper) 60%,var(--ink));margin-bottom:14px}
+#notes .body{font-size:22px;line-height:1.42;columns:2;column-gap:72px}
+#notes .body p{margin-bottom:8px;break-inside:avoid}
+
+/* slide 1 */
+.s1-grid{display:grid;grid-template-columns:1fr 600px;gap:96px;margin-top:44px}
+.situ{font-size:30px;max-width:980px}
+.limit{margin-top:30px;font-size:24px;font-weight:600;display:flex;gap:14px;align-items:center}
+.limit .tag{background:var(--amber);color:var(--ink);padding:2px 12px;border-radius:4px;font-size:18px;letter-spacing:.1em;text-transform:uppercase}
+.tasks{list-style:none;margin-top:28px;counter-reset:t}
+.tasks li{counter-increment:t;display:grid;grid-template-columns:64px 1fr;align-items:baseline;font-size:27px;line-height:1.3;padding:10px 0;border-top:1.5px solid var(--faint)}
+.tasks li::before{content:counter(t);font-family:var(--display);font-size:38px;font-weight:700;color:var(--leaf)}
+.tasks li b{font-weight:700}
+.scale{display:grid;grid-template-columns:1fr 1fr;gap:34px 40px}
+.scale div{border-left:6px solid var(--leaf);padding-left:20px}
+.scale strong{display:block;font-family:var(--display);font-size:92px;line-height:1;font-weight:700;letter-spacing:-.02em}
+.scale span{font-size:24px;color:var(--muted)}
+.cons{margin-top:44px}
+.cons h2{font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.cons ul{list-style:none}
+.cons li{font-size:24px;padding:8px 0;border-top:1.5px solid var(--faint);display:grid;grid-template-columns:170px 1fr}
+.cons li b{font-family:var(--display);font-size:30px}
+
+/* slide 2 */
+.s2-grid{display:grid;grid-template-columns:470px 1fr;gap:40px;margin-top:22px}
+.legend{list-style:none;margin-top:6px}
+.legend li{display:flex;align-items:center;gap:14px;font-size:21px;padding:6px 0}
+.legend svg{flex:none}
+.svcpanel{margin-top:30px;border-top:3px solid var(--ink);padding-top:22px;min-height:330px}
+.svcpanel .n{font-size:20px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+.svcpanel h2{font-family:var(--display);font-size:46px;line-height:1.1;margin:8px 0 14px}
+.svcpanel p{font-size:27px}
+#arch{width:1186px;height:733px;display:block}
+#arch text{font-family:var(--body);fill:var(--ink)}
+#arch .svc rect.box{fill:var(--paper);stroke:var(--ink);stroke-width:2}
+#arch .svc.pending rect.box{stroke:var(--amber);stroke-dasharray:8 6;stroke-width:2.5}
+#arch .svc.ext rect.box{stroke-dasharray:4 5}
+#arch .svc{transition:opacity .3s}
+#arch .svc .nm{font-size:22px;font-weight:700}
+#arch .svc .sb{font-size:16px;fill:var(--muted)}
+#arch.focus .svc{opacity:.28}
+#arch.focus .svc.on{opacity:1}
+#arch .svc.on rect.box{fill:color-mix(in srgb,var(--leaf) 14%,var(--paper));stroke-width:4}
+#arch .req{stroke:var(--leaf);stroke-width:3.5;fill:none}
+#arch .dat{stroke:var(--river);stroke-width:3.5;fill:none;stroke-dasharray:10 6}
+#arch .pend{stroke-dasharray:3 7;stroke:var(--amber)}
+#arch.focus path[data-s]{opacity:.22;transition:opacity .3s}
+#arch.focus path[data-s].on{opacity:1}
+
+/* slide 3 */
+.track{position:relative;margin-top:40px;display:grid;grid-template-columns:repeat(7,1fr);gap:22px 18px}
+.node{position:relative;border-top:6px solid var(--faint);padding:14px 4px 0 0;min-height:132px;transition:border-color .3s}
+.node .no{font-family:var(--display);font-size:30px;font-weight:700;color:var(--muted)}
+.node .nm{font-size:23px;font-weight:700;line-height:1.18;margin-top:2px}
+.node .ct{display:inline-block;margin-top:10px;font-size:15px;font-weight:600;color:var(--muted)}
+.node.model .ct{color:var(--paper);background:var(--river);padding:2px 9px;border-radius:4px}
+.node.done{border-top-color:var(--leaf)}
+.node.done .no{color:var(--leaf)}
+.node.cur{border-top-color:var(--ink)}
+.node.cur .no{color:var(--ink)}
+.node.cur .nm{text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:6px}
+#token{position:absolute;top:-17px;left:0;width:28px;height:28px;border-radius:50%;background:var(--leaf);border:4px solid var(--paper);box-shadow:0 0 0 2px var(--leaf);transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);opacity:0}
+.detail{margin-top:34px;display:grid;grid-template-columns:1fr 640px;gap:64px;border-top:3px solid var(--ink);padding-top:26px;min-height:300px}
+.detail .lead{font-family:var(--display);font-size:40px;line-height:1.2}
+.detail .cost{margin-top:18px;font-size:22px;font-weight:600}
+.detail .cost.model{color:var(--river)}
+.detail .cost.code{color:var(--leaf)}
+.extra{font-size:20px}
+.extra ul{list-style:none}
+.extra li{padding:6px 0;border-top:1.5px solid var(--faint);display:grid;grid-template-columns:70px 1fr}
+.extra li b{font-weight:700}
+.extra.plain li{grid-template-columns:1fr}
+.foot{position:absolute;left:112px;right:400px;bottom:78px;font-size:19px;color:var(--muted)}
+.foot b{color:var(--ink)}
+
+/* slide 4 */
+.s4-grid{display:grid;grid-template-columns:560px 1fr;gap:56px;margin-top:30px}
+.warnline{font-size:21px;font-weight:600;padding:10px 14px;background:color-mix(in srgb,var(--amber) 20%,var(--paper));border-left:6px solid var(--amber);margin-bottom:18px}
+.checks{list-style:none}
+.checks li{display:grid;grid-template-columns:46px 1fr;gap:12px;align-items:center;font-size:23px;padding:13px 0;border-top:1.5px solid var(--faint);cursor:pointer;user-select:none}
+.checks .bx{width:34px;height:34px;border:3px solid var(--ink);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.checks li.ticked .bx{background:var(--leaf);border-color:var(--leaf)}
+.checks li.ticked .bx::after{content:"";width:9px;height:17px;border:solid var(--paper);border-width:0 4px 4px 0;transform:rotate(45deg) translate(-1px,-2px)}
+.checks li.ticked .lbl{color:var(--muted)}
+.frame{position:relative;height:790px;border:3px solid var(--ink);background:var(--wash);display:flex;flex-direction:column}
+.frame.live{border-style:dashed}
+.fhead{display:flex;align-items:center;gap:16px;padding:14px 22px;border-bottom:2px solid var(--faint);font-size:20px}
+.mode{font-weight:800;letter-spacing:.12em;padding:4px 12px;border-radius:4px;font-size:18px}
+.mode.replay{background:var(--amber);color:var(--ink)}
+.mode.liveon{background:var(--leaf);color:var(--paper)}
+.fhead .ttl{font-weight:700;font-size:23px}
+.fhead .cnt{margin-left:auto;color:var(--muted)}
+.fbody{flex:1;padding:24px 28px;display:grid;grid-template-columns:400px 1fr;gap:36px;overflow:hidden}
+.fbody.one{grid-template-columns:1fr}
+.fsrc{padding:10px 22px;border-top:2px solid var(--faint);font-size:16px;color:var(--muted)}
+.rec{font-size:20px}
+.rec div{display:grid;grid-template-columns:230px 1fr;padding:7px 0;border-top:1.5px solid var(--faint)}
+.rec div span:first-child{color:var(--muted)}
+.rec div span:last-child{font-weight:600;word-break:break-word}
+.rec .hot span:last-child{color:var(--leaf)}
+.rec .bad span:last-child{color:#9C3A1F}
+.phone{width:380px;height:600px;border:3px solid var(--ink);border-radius:36px;background:var(--paper);position:relative;overflow:hidden;align-self:start}
+.phone .chat{padding:30px 22px;font-size:17px;color:var(--muted)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-top:3px solid var(--ink);border-radius:22px 22px 0 0;padding:16px 20px 22px}
+.sheet .grab{width:60px;height:5px;border-radius:3px;background:var(--faint);margin:0 auto 12px}
+.sheet .t{font-size:17px;color:var(--muted)}
+.sheet .q{font-size:22px;font-weight:700;margin:8px 0 12px}
+.opt{display:block;border:2px solid var(--faint);border-radius:10px;padding:9px 14px;font-size:20px;margin-bottom:8px}
+.opt.tap{border-color:var(--leaf);background:color-mix(in srgb,var(--leaf) 16%,#fff);font-weight:700}
+.sheet .row{display:flex;justify-content:space-between;font-size:16px;color:var(--muted);margin-top:6px}
+.sq{font-size:21px}
+.sq .item{padding:10px 0 12px;border-top:1.5px solid var(--faint)}
+.sq .hi{font-size:23px;font-weight:700}
+.sq .en{font-size:17px;color:var(--muted);margin:2px 0 8px}
+.sq .opts{display:flex;flex-wrap:wrap;gap:8px}
+.sq .opts span{border:2px solid var(--faint);border-radius:8px;padding:3px 10px;font-size:18px;background:var(--paper)}
+.sq .opts span.tap{border-color:var(--leaf);font-weight:700}
+.big{font-family:var(--display);font-size:36px;line-height:1.2}
+.livebox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-size:26px;color:var(--muted)}
+
+/* slide 5 */
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:36px;margin-top:56px}
+.tile{border-top:6px solid var(--leaf);padding-top:16px}
+.tile .v{font-family:var(--display);font-size:68px;font-weight:700;line-height:1.05;letter-spacing:-.01em;min-height:76px}
+.tile .v small{font-size:34px;color:var(--muted)}
+.tile .l{font-size:22px;font-weight:600;margin-top:8px}
+.tile .s{font-size:17px;color:var(--muted);margin-top:8px;line-height:1.35}
+.tile .s .chip{font-size:13px}
+table.why{width:100%;border-collapse:collapse;margin-top:64px;font-size:21px}
+table.why th{text-align:left;font-family:var(--display);font-size:30px;width:220px;vertical-align:top;padding:12px 0}
+table.why td{padding:12px 0;border-top:1.5px solid var(--faint);line-height:1.38}
+table.why tr:first-child td,table.why tr:first-child th{border-top:3px solid var(--ink)}
+table.why th{border-top:1.5px solid var(--faint)}
+.close{margin-top:56px;font-family:var(--display);font-size:38px;line-height:1.2;max-width:1500px}
+.close b{color:var(--leaf)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+<div id="viewport">
+<div id="stage">
+
+<!-- ============ SLIDE 1 ============ -->
+<section class="slide" data-n="1" data-steps="0" data-star="ST">
+  <div class="kicker"><b>1</b> &nbsp;Problem statement</div>
+  <h1>FarmerChat gives advice. It does not learn what happened next.</h1>
+  <div class="s1-grid">
+    <div>
+      <p class="situ">Digital Green's FarmerChat gives advice to farmers in Bihar. After the advice, FarmerChat gets no measured outcome.</p>
+      <div class="limit"><span class="tag">Limit</span> There is no real delivery. All data is synthetic.</div>
+      <ol class="tasks">
+        <li><span><b>Decide</b> which conversations get a follow-up survey.</span></li>
+        <li><span><b>Write</b> 1 to 3 tap questions in the farmer's language.</span></li>
+        <li><span><b>Schedule</b> the survey in a send window.</span></li>
+        <li><span><b>Record</b> the answers.</span></li>
+        <li><span><b>Route</b> bad outcomes back for help.</span></li>
+      </ol>
+    </div>
+    <div>
+      <div class="scale">
+        <div><strong>300</strong><span>farmers</span></div>
+        <div><strong>6,999</strong><span>insights</span></div>
+        <div><strong>150</strong><span>golden cases</span></div>
+        <div><strong>183</strong><span>outcome records</span></div>
+      </div>
+      <p class="src" style="margin-top:14px">Participant pack scale. Source: pack/README.txt</p>
+      <div class="cons">
+        <h2>Three constraints</h2>
+        <ul>
+          <li><b>Cost</b><span>Few model tokens for each survey.</span></li>
+          <li><b>Security</b><span>Farmer identity from the JWT only.</span></li>
+          <li><b>Simplicity</b><span>Few parts to build and deploy.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 2 ============ -->
+<section class="slide" data-n="2" data-steps="13" data-star="A">
+  <div class="kicker"><b>2</b> &nbsp;Solution architecture</div>
+  <h1 style="font-size:60px">One request path. One data path.</h1>
+  <div class="s2-grid">
+    <div>
+      <ul class="legend">
+        <li><svg width="70" height="14"><line x1="0" y1="7" x2="70" y2="7" stroke="#2E6B3F" stroke-width="4"/></svg>Request path</li>
+        <li><svg width="70" height="14"><line x1="0" y1="7" x2="70" y2="7" stroke="#2F5E86" stroke-width="4" stroke-dasharray="10 6"/></svg>Data path</li>
+        <li><svg width="70" height="24"><rect x="2" y="2" width="66" height="20" fill="none" stroke="#C7860A" stroke-width="2.5" stroke-dasharray="8 6"/></svg>Not confirmed yet</li>
+      </ul>
+      <div class="svcpanel" id="svcpanel"></div>
+    </div>
+    <svg id="arch" viewBox="0 0 1230 760" role="img" aria-label="Architecture of mel-agent on AWS us-west-2">
+      <defs>
+        <marker id="mreq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2E6B3F"/></marker>
+        <marker id="mdat" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2F5E86"/></marker>
+        <marker id="mpen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#C7860A"/></marker>
+      </defs>
+      <!-- AWS boundary -->
+      <rect x="190" y="14" width="820" height="732" fill="none" stroke="#1D2420" stroke-width="2.5"/>
+      <text x="206" y="42" style="font-size:18px;font-weight:700;letter-spacing:.12em">AWS · US-WEST-2</text>
+      <text x="1040" y="500" style="font-size:16px;font-weight:700;letter-spacing:.12em;fill:#6e6f68">OUTSIDE AWS</text>
+      <!-- compute group -->
+      <rect x="470" y="196" width="280" height="264" fill="none" stroke="#1D2420" stroke-width="1.5" stroke-dasharray="2 5"/>
+      <text x="482" y="218" style="font-size:15px;font-weight:700;letter-spacing:.1em;fill:#6e6f68">APPLICATION CODE: mel</text>
+      <text x="206" y="636" style="font-size:15px;font-weight:700;letter-spacing:.1em;fill:#6e6f68">OBSERVE AND CONTROL COST</text>
+
+      <!-- request path arrows -->
+      <path data-s="0 1" class="req" d="M85 240V102H218" marker-end="url(#mreq)"/>
+      <path data-s="0 2" class="req" d="M160 278H218" marker-end="url(#mreq)"/>
+      <path data-s="2 3" class="req" d="M420 278H488" marker-end="url(#mreq)"/>
+      <path data-s="3 4 5" class="req" d="M590 196V142" marker-end="url(#mreq)"/>
+      <path data-s="3 4 7" class="req" d="M750 420H766V560H1038" marker-end="url(#mreq)"/>
+      <path data-s="0 11" class="req pend" d="M85 316V558H218" marker-end="url(#mpen)"/>
+      <path data-s="11 10" class="req pend" d="M420 558H478" marker-end="url(#mpen)"/>
+      <!-- data path arrows -->
+      <path data-s="3 4 8" class="dat" d="M750 274H788" marker-end="url(#mdat)"/>
+      <path data-s="3 4 9" class="dat" d="M750 394H788" marker-end="url(#mdat)"/>
+      <path data-s="9" class="dat" d="M890 432V450" marker-end="url(#mdat)"/>
+      <path data-s="6 3 4" class="dat" d="M790 102H730V194" marker-end="url(#mdat)"/>
+      <path data-s="3 4 10" class="dat" d="M590 460V518" marker-end="url(#mdat)"/>
+
+      <!-- services -->
+      <g class="svc ext" data-i="0"><rect class="box" x="10" y="240" width="150" height="76" rx="6"/><text class="nm" x="22" y="272">Simulator</text><text class="sb" x="22" y="298">farmer's browser</text></g>
+      <g class="svc" data-i="1"><rect class="box" x="220" y="64" width="200" height="76" rx="6"/><text class="nm" x="234" y="96">Cognito</text><text class="sb" x="234" y="122">user pool, JWT</text></g>
+      <g class="svc" data-i="2"><rect class="box" x="220" y="240" width="200" height="76" rx="6"/><text class="nm" x="234" y="272">API Gateway</text><text class="sb" x="234" y="298">HTTP API, JWT check</text></g>
+      <g class="svc" data-i="3"><rect class="box" x="490" y="232" width="240" height="84" rx="6"/><text class="nm" x="504" y="266">Lambda</text><text class="sb" x="504" y="294">function mel-api</text></g>
+      <g class="svc" data-i="4"><rect class="box" x="490" y="350" width="240" height="94" rx="6"/><text class="nm" x="504" y="384">AgentCore Runtime</text><text class="sb" x="504" y="410">container mel-agent</text><text class="sb" x="504" y="432">image in ECR</text></g>
+      <g class="svc" data-i="5"><rect class="box" x="480" y="64" width="220" height="76" rx="6"/><text class="nm" x="494" y="96">Bedrock</text><text class="sb" x="494" y="122">gpt-6-luna, global</text></g>
+      <g class="svc" data-i="6"><rect class="box" x="790" y="64" width="210" height="76" rx="6"/><text class="nm" x="804" y="96">Secrets Manager</text><text class="sb" x="804" y="122">mel/jev-api-key</text></g>
+      <g class="svc ext" data-i="7"><rect class="box" x="1040" y="520" width="182" height="80" rx="6"/><text class="nm" x="1054" y="552">TypeSafe Jev</text><text class="sb" x="1054" y="578">external HTTPS</text></g>
+      <g class="svc" data-i="8"><rect class="box" x="790" y="236" width="210" height="76" rx="6"/><text class="nm" x="804" y="268">DynamoDB</text><text class="sb" x="804" y="294">table mel-ledger</text></g>
+      <g class="svc" data-i="9"><rect class="box" x="790" y="356" width="210" height="76" rx="6"/><text class="nm" x="804" y="388">SQS</text><text class="sb" x="804" y="414">follow-up queue</text><rect class="box" x="815" y="452" width="150" height="48" rx="6"/><text class="sb" x="830" y="482" style="fill:#1D2420;font-weight:600">DLQ</text></g>
+      <g class="svc" data-i="10"><rect class="box" x="480" y="520" width="220" height="76" rx="6"/><text class="nm" x="494" y="552">S3</text><text class="sb" x="494" y="578">simulator, artifacts</text></g>
+      <g class="svc pending" data-i="11"><rect class="box" x="220" y="520" width="200" height="76" rx="6"/><text class="nm" x="234" y="552">CloudFront</text><text class="sb" x="234" y="578" style="fill:#8a5d06;font-weight:700">PENDING</text></g>
+      <g class="svc" data-i="12"><rect class="box" x="480" y="650" width="220" height="76" rx="6"/><text class="nm" x="494" y="682">CloudWatch</text><text class="sb" x="494" y="708">dashboard, alarms</text></g>
+      <g class="svc" data-i="13"><rect class="box" x="790" y="650" width="210" height="76" rx="6"/><text class="nm" x="804" y="682">AWS Budgets</text><text class="sb" x="804" y="708">monthly budget</text></g>
+    </svg>
+  </div>
+  <div class="hint">Press <kbd>→</kbd> to show each service in turn.</div>
+</section>
+
+<!-- ============ SLIDE 3 ============ -->
+<section class="slide" data-n="3" data-steps="13" data-star="A">
+  <div class="kicker"><b>3</b> &nbsp;Application flow</div>
+  <h1 style="font-size:60px">One insight, 13 steps, 2 model calls.</h1>
+  <div class="track" id="track"><div id="token"></div></div>
+  <div class="detail" id="detail"></div>
+  <div class="foot"><b>Timing profiles.</b> golden_v1 is the default and follows the golden send windows. rules_v1 applies rules.json window_rules exactly.</div>
+  <div class="hint">Press <kbd>→</kbd> to move the insight one step.</div>
+</section>
+
+<!-- ============ SLIDE 4 ============ -->
+<section class="slide" data-n="4" data-steps="8" data-star="A">
+  <div class="kicker"><b>4</b> &nbsp;Demo</div>
+  <h1 style="font-size:60px">Live demo, with a recorded replay.</h1>
+  <div class="s4-grid">
+    <div>
+      <div class="warnline">If the live system fails, press L to show the replay.</div>
+      <ul class="checks" id="checks"></ul>
+      <p class="src" style="margin-top:12px">Click a step or press 1 to 6 to tick it.</p>
+    </div>
+    <div class="frame" id="frame"></div>
+  </div>
+  <div class="hint">Press <kbd>→</kbd> for the next replay frame. Press <kbd>L</kbd> for live or replay.</div>
+</section>
+
+<!-- ============ SLIDE 5 ============ -->
+<section class="slide" data-n="5" data-steps="0" data-star="R">
+  <div class="kicker"><b>5</b> &nbsp;Why this solution, and the impact</div>
+  <h1 style="font-size:60px">Decisions in code. Model calls only for language.</h1>
+  <div class="tiles">
+    <div class="tile">
+      <div class="v">150<small> / 150</small></div>
+      <div class="l">Golden-set decisions that match, with 0 model calls</div>
+      <div class="s">Wave 0 rule check in CONTRACTS.md. <span class="chip">pending <i>evidence/REPORT.md</i></span></div>
+    </div>
+    <div class="tile">
+      <div class="v"><span class="chip" style="font-size:30px">pending</span><small> / 183</small></div>
+      <div class="l">Outcome fixtures that pass</div>
+      <div class="s">The total of 183 comes from pack/README.txt. <span class="chip">pending <i>evidence/REPORT.md</i></span></div>
+    </div>
+    <div class="tile">
+      <div class="v">$0.000210</div>
+      <div class="l">Cost for each accepted survey, <span style="white-space:nowrap">gpt-6-luna</span></div>
+      <div class="s">Generation only, in the model eval. The list price is not verified. <span class="chip">pending <i>evidence/REPORT.md</i></span></div>
+    </div>
+    <div class="tile">
+      <div class="v"><span class="chip" style="font-size:30px">pending</span></div>
+      <div class="l">Latency p50 and p95, end to end</div>
+      <div class="s">The model call alone has a p50 of 1146 ms in the eval. <span class="chip">pending <i>evidence/REPORT.md</i></span></div>
+    </div>
+  </div>
+  <table class="why">
+    <tr><th>Cost</th><td>Decisions, timing and outcomes are deterministic code. The eval chose <span style="white-space:nowrap">gpt-6-luna</span>: 15 of 15 passed at the lowest priced cost. Prompt caching <span class="chip">pending <i>not in listed files</i></span></td></tr>
+    <tr><th>Security</th><td>Farmer identity comes from the JWT only. Each component has its own least-privilege IAM role. The Jev key stays in Secrets Manager. A Jev failure holds the survey for review. Adversarial review <span class="chip">pending <i>REVIEW.md pass count</i></span></td></tr>
+    <tr><th>Simplicity</th><td>One Python package, mel. One DynamoDB table. One static simulator page. One deploy script.</td></tr>
+  </table>
+  <p class="close">Every piece of advice gets a <b>measured outcome</b>. Farmers with bad outcomes <b>get help</b>.</p>
+</section>
+
+<div class="star" id="star"><span>S</span><span>T</span><span>A</span><span>R</span></div>
+<div id="timer">0:00 / 6:00</div>
+<div id="progress"></div>
+<div id="notes"><h3 id="notesh"></h3><div class="body" id="notesb"></div></div>
+</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var stage=document.getElementById("stage");
+var slides=[].slice.call(document.querySelectorAll(".slide"));
+var state={slide:0,step:0,live:false,notes:false};
+
+function fit(){
+  var s=Math.min(window.innerWidth/1920,window.innerHeight/1080);
+  stage.style.transform="scale("+s+")";
+  stage.style.left=((window.innerWidth-1920*s)/2)+"px";
+  stage.style.top=((window.innerHeight-1080*s)/2)+"px";
+}
+window.addEventListener("resize",fit);fit();
+
+function esc(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function chip(src){return '<span class="chip">pending <i>'+esc(src)+'</i></span>';}
+
+/* ---------- slide 2 data ---------- */
+var SVC=[
+ [0,"Overview","The diagram shows the services in infra/README.md. infra/INFRA.md is not on main yet."],
+ [1,"Cognito","Cognito signs in the farmer and issues a JWT that carries farmer_id and org_id."],
+ [2,"API Gateway","API Gateway checks the JWT, validates each request and throttles at rate 1, burst 10."],
+ [3,"Lambda","The Lambda function mel-api runs the agent code for each API request."],
+ [4,"AgentCore Runtime","AgentCore Runtime runs the agent as a container from the ECR repository mel-agent."],
+ [5,"Bedrock","Bedrock runs gpt-6-luna through a global cross-region inference profile, called from us-west-2."],
+ [6,"Secrets Manager","Secrets Manager holds the Jev API key, so no client sees it."],
+ [7,"TypeSafe Jev","Jev is an external HTTPS service that answers 5 typed checks on each survey."],
+ [8,"DynamoDB","DynamoDB holds the ledger in one table, scoped by org_id and farmer_id."],
+ [9,"SQS with DLQ","SQS holds the follow-up queue. The dead-letter queue keeps messages that fail."],
+ [10,"S3","S3 holds the simulator page and the artifacts, with public access blocked."],
+ [11,"CloudFront","CloudFront for the simulator is not confirmed. "+chip("infra/INFRA.md")],
+ [12,"CloudWatch","CloudWatch shows the MelAgent metrics on a dashboard and raises alarms."],
+ [13,"AWS Budgets","AWS Budgets sets a monthly cost budget."]
+];
+var arch=document.getElementById("arch");
+function renderS2(step){
+  var g=arch.querySelectorAll(".svc");
+  for(var i=0;i<g.length;i++){g[i].classList.toggle("on",+g[i].getAttribute("data-i")===step);}
+  var ps=arch.querySelectorAll("path[data-s]");
+  for(var j=0;j<ps.length;j++){ps[j].classList.toggle("on",ps[j].getAttribute("data-s").split(" ").indexOf(String(step))>=0);}
+  arch.classList.toggle("focus",step>0);
+  var d=SVC[step];
+  document.getElementById("svcpanel").innerHTML=
+    '<div class="n">'+(step?("Service "+step+" of 13"):"13 services")+'</div><h2>'+d[1]+'</h2><p>'+d[2]+'</p>';
+}
+
+/* ---------- slide 3 data ---------- */
+var STEPS=[
+ ["Schema check",0,"Code validates the insight against the pack insight schema. A failed check goes to rule R1.",null],
+ ["8 decision rules",0,"8 rules run in order, and the first match wins. R1 to R7 give no survey. R8 gives a survey.",
+   ["R1|junk_insight","R2|critical_needs_human_call","R3|nothing_to_verify","R4|waiting_for_details","R5|no_check_needed","R6|window_after_season","R7|crop_already_harvested","R8|survey"]],
+ ["Timing profile",0,"The timing profile sets the send window from the verification timing.",["|golden_v1 is the default profile.","|rules_v1 applies rules.json window_rules."]],
+ ["Handoff",0,"The handoff builds the schedule record for the scheduler.",["|Channel order and wait hours","|Frequency cap","|Priority","|Expiry time"]],
+ ["Generation on Bedrock",1,"Bedrock writes 1 to 3 tap questions in the farmer's language. The limit is 600 output tokens.",["|Model: gpt-6-luna","|Insight text goes in the user turn, never in the system prompt."]],
+ ["Validation and invariants",0,"Code validates the survey against the pack schema and the invariants. Our validator sets schema_valid.",["|1 to 3 items","|Unique item_id","|2 to 10 options","|Labels of 20 code points or fewer","|Scales of 10 steps or fewer"]],
+ ["5 Jev checks",2,"Jev answers 5 typed questions about the final survey. A Jev failure holds the survey for review.",["|matches_advice","|gives_new_advice","|asks_personal_info","|inappropriate_content","|language_matches_tag"]],
+ ["Ledger",0,"The ledger stores the survey. Every read and write is scoped by org_id and farmer_id.",null],
+ ["Virtual clock",0,"A virtual clock moves time to the send window. No real message goes out.",null],
+ ["Channel rendering",0,"The renderer builds the view for each channel.",["|app","|web","|whatsapp","|telegram","|voice"]],
+ ["Answer",0,"The simulator records the farmer's answer as a response record.",null],
+ ["Outcome code",0,"Code maps the answer to a status and an outcome code from outcome_codes.json.",null],
+ ["Follow-up queue",0,"A bad outcome creates a follow-up item on the SQS follow-up queue.",null]
+];
+var track=document.getElementById("track");
+STEPS.forEach(function(s,i){
+  var n=document.createElement("div");
+  n.className="node"+(s[1]?" model":"");
+  n.innerHTML='<div class="no">'+(i+1)+'</div><div class="nm">'+esc(s[0])+'</div><div class="ct">'+
+    (s[1]===1?"model call: Bedrock tokens":s[1]===2?"model call: Jev":"code only, zero tokens")+'</div>';
+  track.appendChild(n);
+});
+function renderS3(step){
+  var nodes=track.querySelectorAll(".node"), tok=document.getElementById("token");
+  for(var i=0;i<nodes.length;i++){
+    nodes[i].classList.toggle("done",i<step-1);
+    nodes[i].classList.toggle("cur",i===step-1);
+  }
+  var det=document.getElementById("detail");
+  if(step===0){
+    tok.style.opacity=0;
+    det.innerHTML='<div><div class="lead">Insight I-005330: brown spots on potato leaves. The advice is to wait and check for 3 days.</div>'+
+      '<div class="cost code">Source: pack scenario 3-potato-blight-wait</div></div><div class="extra plain"><ul>'+
+      '<li>11 steps are code only, with zero tokens.</li><li>2 steps are model calls.</li></ul></div>';
+    return;
+  }
+  var cur=nodes[step-1];
+  tok.style.opacity=1;
+  tok.style.left=(cur.offsetLeft)+"px";
+  tok.style.top=(cur.offsetTop-17)+"px";
+  var s=STEPS[step-1], ex="";
+  if(s[3]){
+    var plain=s[3][0].charAt(0)==="|";
+    ex='<div class="extra'+(plain?" plain":"")+'"><ul>'+s[3].map(function(x){
+      var p=x.split("|");return plain?'<li>'+esc(p[1])+'</li>':'<li><b>'+esc(p[0])+'</b><span>'+esc(p[1])+'</span></li>';
+    }).join("")+'</ul></div>';
+  } else ex='<div></div>';
+  det.innerHTML='<div><div class="lead">'+esc(s[2])+'</div><div class="cost '+(s[1]?"model":"code")+'">'+
+    (s[1]===1?"This step is a model call. It costs Bedrock tokens.":s[1]===2?"This step is a model call to Jev.":"Code only, zero tokens.")+'</div></div>'+ex;
+}
+
+/* ---------- slide 4 data ---------- */
+var CHECKS=[1,2,3,4,5,6];
+var checksEl=document.getElementById("checks"), ticked={};
+CHECKS.forEach(function(n){
+  var li=document.createElement("li");li.setAttribute("data-k",n);
+  li.innerHTML='<span class="bx"></span><span class="lbl">Step '+n+' '+chip("DEMO.md")+'</span>';
+  li.addEventListener("click",function(e){e.stopPropagation();toggleCheck(n);});
+  checksEl.appendChild(li);
+});
+function toggleCheck(n){ticked[n]=!ticked[n];checksEl.querySelector('[data-k="'+n+'"]').classList.toggle("ticked",!!ticked[n]);}
+
+var P="pack/json/scenarios/3-potato-blight-wait/";
+var O="pack/json/outcomes/app/survey-single-select/";
+function rec(rows){return '<div class="rec">'+rows.map(function(r){
+  return '<div'+(r[2]?' class="'+r[2]+'"':'')+'><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>';}).join("")+'</div>';}
+var FRAMES=[
+ {t:"Potato survey in Hindi",src:P+"survey.hi-IN.json and survey.en-IN.json",one:true,html:
+  '<div class="sq">'+
+  '<div class="item"><div class="hi">क्या आपने पिछले 3 दिनों में आलू के पत्ते देखे?</div><div class="en">Did you check the potato leaves in the last 3 days?</div><div class="opts"><span>हाँ</span><span>नहीं</span></div></div>'+
+  '<div class="item"><div class="hi">भूरे धब्बों का अब क्या हाल है?</div><div class="en">What is happening to the brown spots?</div><div class="opts"><span>नए धब्बे नहीं</span><span>पहले जैसे ही</span><span>फैल रहे हैं</span><span>सफ़ेद फफूंद दिखी</span></div></div>'+
+  '<div class="item"><div class="hi">सलाह कितनी काम की रही? 1 मतलब बिल्कुल नहीं, 5 मतलब बहुत काम की।</div><div class="en">How useful was the advice? 1 means not useful, 5 means very useful.</div><div class="opts"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div></div>'+
+  '</div>'},
+ {t:"App bottom sheet, step 2 of 3",src:P+"render/hi-IN/app.json",html:
+  '<div class="phone"><div class="chat">FarmerChat</div><div class="sheet"><div class="grab"></div>'+
+  '<div class="t">आपको मिली सलाह पर एक छोटा सवाल · 3 में से 2</div><div class="q">भूरे धब्बों का अब क्या हाल है?</div>'+
+  '<span class="opt">नए धब्बे नहीं</span><span class="opt">पहले जैसे ही</span><span class="opt tap">फैल रहे हैं</span><span class="opt">सफ़ेद फफूंद दिखी</span>'+
+  '<div class="row"><span>छोड़ें</span><span>बंद करें</span></div></div></div>'+
+  rec([["presentation","bottom_sheet"],["opens_when","push_tapped, next_app_open"],["waits_for","answer finished, no typing for 5 seconds, no call"],["one_question_per_step","true"],["can_skip, can_close","true, true"]])},
+ {t:"Answer: spreading",src:P+"responses/whatsapp.json",one:true,html:
+  rec([["survey_id","S-21310"],["channel","whatsapp"],["answers","q1 yes · q2 spreading · q3 2"],["status","negative_outcome","bad"],["counts_toward_cap","true"],["needs_follow_up","true","hot"],["follow_up_reasons","crop_or_animal_damaged","hot"]])},
+ {t:"Follow-up item",src:"Fields: mel/models.py FollowUpItem. Values: "+P+"responses/whatsapp.json",one:true,html:
+  '<p class="big" style="margin-bottom:18px">The farmer gets help, because the spots are spreading.</p>'+
+  rec([["farmer_id","F-000245"],["survey_id","S-21310"],["response_key","rk-S-21310-whatsapp"],["source_insight_ids","I-005330"],["reasons","crop_or_animal_damaged","hot"],["accepted_answers","q1 yes · q2 spreading · q3 2"]])},
+ {t:"No survey: zero tillage",src:"pack/json/scenarios/6-zero-tillage-info-no-survey/ and proposals/CONFLICTS.md",one:true,html:
+  '<p class="big" style="margin-bottom:18px">"What is zero tillage and why is it said to be good for wheat?"</p>'+
+  rec([["insight_id","I-004101"],["resolution_type","generic_information"],["rule","R3 nothing_to_verify"],["decision","no_survey","hot"],["reason_code","generic_information"],["model calls","0"]])},
+ {t:"Push failure",src:O+"push_token_invalid.json (mustard scenario S-20931)",one:true,html:
+  rec([["failure_code","push_token_invalid","bad"],["status","delivery_failed"],["raw_event","push service: UNREGISTERED"],["retry_decision","fall_back_to_next_channel","hot"],["counts_toward_cap","false"]])},
+ {t:"Partial answer",src:O+"sheet_closed_partway.json (mustard scenario S-20931)",one:true,html:
+  rec([["sheet_outcome","closed_partway"],["raw_event","Close tapped at step 3 of 3"],["answers","q1 yes · q2 easy · q3 skipped"],["status","partial","hot"],["counts_toward_cap","true"]])},
+ {t:"Duplicate answer",src:O+"duplicate_answer.json (mustard scenario S-20931)",one:true,html:
+  '<p class="big" style="margin-bottom:18px">The ledger keeps the first answer.</p>'+
+  rec([["failure_code","duplicate_answer"],["status","duplicate","hot"],["farmerchat_reply","HTTP 200, duplicate"],["q3 second copy","discarded"],["counts_toward_cap","false"]])},
+ {t:"Opt-out",src:O+"farmer_opted_out.json (mustard scenario S-20931)",one:true,html:
+  '<p class="big" style="margin-bottom:18px">The agent stops all future surveys to this farmer.</p>'+
+  rec([["raw_event","tapped Do not ask me again in the sheet"],["failure_code","farmer_opted_out","bad"],["status","declined"],["retry_decision","give_up","hot"]])}
+];
+var frame=document.getElementById("frame");
+function renderS4(step){
+  frame.classList.toggle("live",state.live);
+  if(state.live){
+    frame.innerHTML='<div class="fhead"><span class="mode liveon">LIVE</span><span class="ttl">Simulator</span><span class="cnt">Press L for the replay</span></div>'+
+      '<div class="livebox"><div>Simulator URL</div>'+chip("infra/INFRA.md")+'<div style="font-size:20px">Open the simulator in a browser tab next to this deck.</div></div>';
+    return;
+  }
+  var f=FRAMES[step];
+  frame.innerHTML='<div class="fhead"><span class="mode replay">REPLAY</span><span class="ttl">'+esc(f.t)+'</span><span class="cnt">Frame '+(step+1)+' of '+FRAMES.length+'</span></div>'+
+    '<div class="fbody'+(f.one?" one":"")+'">'+f.html+'</div><div class="fsrc">Recorded pack record: '+esc(f.src)+'</div>';
+}
+
+/* ---------- notes ---------- */
+var NOTES=[
+ ["Slide 1. Situation and task. Target 0:00 to 0:50.",[
+  "Digital Green's FarmerChat gives advice to farmers in Bihar.",
+  "After the advice, FarmerChat does not learn what happened.",
+  "Note the limit first. There is no real delivery, and all data is synthetic.",
+  "Our task has 5 parts. The agent decides which conversations get a follow-up survey.",
+  "It writes 1 to 3 tap questions in the farmer's language.",
+  "It schedules the survey in a send window. It records the answers.",
+  "It routes bad outcomes back for help.",
+  "The pack has 300 farmers, 6,999 insights, 150 golden cases and 183 outcome records.",
+  "3 constraints shape every choice: cost, security and simplicity."]],
+ ["Slide 2. Action: architecture. Target 0:50 to 2:00. Press the right arrow for each service.",[
+  "This is the deployed system in AWS us-west-2.",
+  "Green arrows show the request path. Blue arrows show the data path.",
+  "Cognito signs in the farmer and issues a JWT.",
+  "API Gateway checks the JWT and sends the request to the Lambda function.",
+  "AgentCore Runtime runs the same agent code as a container.",
+  "Bedrock runs gpt-6-luna through a cross-region inference profile.",
+  "The Jev key stays in Secrets Manager. Jev is outside AWS.",
+  "DynamoDB holds the ledger in one table.",
+  "SQS holds the follow-up queue. A dead-letter queue keeps failed messages.",
+  "S3 holds the simulator page and the artifacts.",
+  "CloudFront is pending. Do not talk about it until infra/INFRA.md confirms it.",
+  "CloudWatch shows the dashboard and alarms. AWS Budgets sets a monthly budget."]],
+ ["Slide 3. Action: application flow. Target 2:00 to 3:10. Press the right arrow for each step.",[
+  "Follow one insight through the agent.",
+  "Code checks the insight against the pack schema.",
+  "8 rules decide survey or no survey. The first match wins. The rules make no model call.",
+  "The timing profile sets the send window. The handoff builds the schedule record.",
+  "Bedrock writes the survey. This is the first model call.",
+  "Code validates the survey against the schema and the invariants.",
+  "Jev answers 5 typed questions about the survey. This is the second model call.",
+  "If Jev fails, the survey waits for review.",
+  "The ledger stores the survey. A virtual clock moves time to the send window.",
+  "The renderer builds the channel view. The simulator records the answer.",
+  "Code maps the answer to an outcome code. A bad outcome goes to the follow-up queue."]],
+ ["Slide 4. Action shown live. Target 3:10 to 5:10.",[
+  "If the live system fails, press L to show the replay.",
+  "Follow the 6 steps in DEMO.md. Tick each step on the slide when you finish it.",
+  "The replay uses recorded pack records.",
+  "First, the potato survey in Hindi. The farmer gets 3 questions.",
+  "Next, the bottom sheet in the app. It shows one question for each step.",
+  "The farmer taps Spreading. The status becomes negative_outcome.",
+  "The agent creates a follow-up item with the reason crop_or_animal_damaged.",
+  "Next, an insight with no survey. The zero tillage insight gives only information, so rule R3 applies.",
+  "Next, the push address fails. The agent falls back to the next channel.",
+  "Next, the farmer closes the sheet early. The status is partial.",
+  "Next, a second copy of an answer arrives. The ledger keeps the first answer.",
+  "Last, the farmer opts out. The agent stops all future surveys to this farmer."]],
+ ["Slide 5. Result. Target 5:10 to 6:00.",[
+  "Do not read a pending chip as a number. Say that the number is pending.",
+  "The rules match 150 of 150 golden decisions with 0 model calls.",
+  "Generation costs $0.000210 for each accepted survey in the eval. The list price is not verified.",
+  "Cost stays low because decisions are code. The eval chose the model.",
+  "Security comes from JWT identity, least-privilege IAM, secrets off clients and the Jev hold.",
+  "Simplicity comes from one package, one table, one static page and one deploy script.",
+  "Every piece of advice gets a measured outcome. Farmers with bad outcomes get help."]]
+];
+
+/* ---------- navigation ---------- */
+function stepsOf(i){return +slides[i].getAttribute("data-steps");}
+function render(){
+  slides.forEach(function(s,i){s.classList.toggle("active",i===state.slide);});
+  var st=slides[state.slide].getAttribute("data-star");
+  [].forEach.call(document.querySelectorAll("#star span"),function(sp){sp.classList.toggle("on",st.indexOf(sp.textContent)>=0);});
+  if(state.slide===1)renderS2(state.step);
+  if(state.slide===2)renderS3(state.step);
+  if(state.slide===3)renderS4(state.step);
+  var n=stepsOf(state.slide);
+  document.getElementById("progress").style.width=((state.slide+(n?state.step/(n+1):0)+ (n?1/(n+1):1))/slides.length*100)+"%";
+  var nt=NOTES[state.slide];
+  document.getElementById("notesh").textContent=nt[0];
+  document.getElementById("notesb").innerHTML=nt[1].map(function(x){return "<p>"+esc(x)+"</p>";}).join("");
+  document.getElementById("notes").classList.toggle("show",state.notes);
+  var h="#"+(state.slide+1);
+  if(location.hash!==h){history.replaceState(null,"",h);}
+}
+function go(sl,st){state.slide=Math.max(0,Math.min(slides.length-1,sl));state.step=Math.max(0,Math.min(st||0,stepsOf(state.slide)));render();}
+function next(){
+  if(state.slide===3&&state.live){go(4,0);return;}
+  if(state.step<stepsOf(state.slide)){state.step++;render();}
+  else if(state.slide<slides.length-1){go(state.slide+1,0);}
+}
+function prev(){
+  if(state.step>0&&!(state.slide===3&&state.live)){state.step--;render();}
+  else if(state.slide>0){go(state.slide-1,stepsOf(state.slide-1));}
+}
+
+/* ---------- timer ---------- */
+var t0=null,timerEl=document.getElementById("timer");
+function startTimer(){if(t0===null){t0=Date.now();setInterval(tick,250);}}
+function tick(){
+  var s=Math.floor((Date.now()-t0)/1000),m=Math.floor(s/60),r=s%60;
+  timerEl.textContent=m+":"+(r<10?"0":"")+r+" / 6:00";
+  timerEl.classList.toggle("warn",s>=300);
+}
+
+document.addEventListener("keydown",function(e){
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  var k=e.key;
+  startTimer();
+  if(k==="ArrowRight"||k==="ArrowDown"||k===" "||k==="PageDown"||k==="Enter"){e.preventDefault();next();}
+  else if(k==="ArrowLeft"||k==="ArrowUp"||k==="PageUp"||k==="Backspace"){e.preventDefault();prev();}
+  else if(k==="Home"){go(0,0);}
+  else if(k==="End"){go(slides.length-1,0);}
+  else if(k==="p"||k==="P"){state.notes=!state.notes;render();}
+  else if((k==="l"||k==="L")&&state.slide===3){state.live=!state.live;render();}
+  else if(state.slide===3&&/^[1-6]$/.test(k)){toggleCheck(+k);}
+});
+stage.addEventListener("click",function(e){startTimer();if(e.clientX<window.innerWidth*0.15){prev();}else{next();}});
+function fromHash(){var n=parseInt(location.hash.replace("#",""),10);if(n>=1&&n<=slides.length&&n-1!==state.slide){go(n-1,0);}}
+window.addEventListener("hashchange",fromHash);
+var n0=parseInt(location.hash.replace("#",""),10);
+state.slide=(n0>=1&&n0<=slides.length)?n0-1:0;
+render();
+window.__deck={go:go,state:state,render:render};
+})();
+</script>
+</body>
+</html>

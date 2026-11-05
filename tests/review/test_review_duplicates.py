@@ -1,14 +1,12 @@
 """Review item 4: duplicate answer overwrites the first.
 
 outcome_codes.json duplicate_answer: "A second answer to a survey already answered. The first
-answer stands." Intake only detects a duplicate when the client re-sends the same response_key
-(ledger sk RESPONSE#<response_key>). The client chooses response_key, so a second answer with a
-new key is stored as a second completed record for the same survey, with its own follow-up.
+answer stands." On main at 816b4a7 a duplicate was found only when the client re-sent the same
+response_key, and a key reused on another survey was a false duplicate. PR #24 applies the
+duplicate rule per survey. These are now regression tests: they need PR #24 on main.
 """
 
 from __future__ import annotations
-
-import pytest
 
 from mel import fixtures
 from mel.api.intake import submit_response
@@ -29,7 +27,6 @@ def _submit(me, sid, body, ledger, clock, codes):
     return submit_response(me, sid, body, ledger, clock, codes, apply_event=apply_event, queue=None)
 
 
-@pytest.mark.xfail(strict=True, reason="REVIEW item 4: duplicates are keyed on client response_key, not survey")
 def test_second_answer_with_new_response_key_is_duplicate(clock):
     survey, _h, ledger, me, codes = _setup()
     first = _submit(me, survey.survey_id, {"response_key": "rk-a", "channel": "app",
@@ -43,7 +40,6 @@ def test_second_answer_with_new_response_key_is_duplicate(clock):
     assert ledger.list_follow_ups(ORG) == []  # the second (negative) answer must not raise a follow-up
 
 
-@pytest.mark.xfail(strict=True, reason="REVIEW item 4: RESPONSE sk has no survey_id, so keys collide across surveys")
 def test_same_response_key_on_another_survey_is_not_a_duplicate(clock):
     survey, handoff, ledger, me, codes = _setup()
     other = survey.model_copy(update={"survey_id": "S-21311"})

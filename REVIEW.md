@@ -9,20 +9,21 @@ Each open item has a test under `tests/review/`. The tests are marked `xfail(str
 turns that into a failure, and the fixer removes the marker. Run `pytest tests/review --runxfail`
 to see each failure.
 
-Result on main at `816b4a7`: 6 open, 9 closed. With integration PR #23: 3 open (items 4, 10, 13),
-12 closed. PR #23 also covers note B (follow-ups filtered to the caller's farmer) and note C
-(`set_opt_out` is now called).
+Result on main at `816b4a7`: 6 open, 9 closed. With integration PRs #23 and #24: 2 open (items 10
+and 13, both in infra/ or the Jev client), 13 closed. PR #23 also covers note B (follow-ups filtered
+to the caller's farmer) and note C (`set_opt_out` is now called).
 
-**Merge order: PR #23 first, then this PR.** Items 3 and 5 are fixed in PR #23. Their tests in
-`tests/review/` have no xfail marker any more, so they fail on main until PR #23 is merged.
+**Merge order: #23, then #24, then this PR.** Items 3 and 5 are fixed in #23, and items 4 and 5 in
+#24. Their tests in `tests/review/` have no xfail marker any more, so they fail on main until both
+PRs are merged.
 
 | # | Item | Status | file:line | Test |
 |---|---|---|---|---|
 | 1 | Identity from body overrides JWT | closed, because identity comes only from `requestContext.authorizer` claims, the payload model forbids every extra key, and the event and attempt use the JWT farmer. Cognito `farmer_id`/`org_id` are immutable and not client-writable. | mel/api/auth.py:71, mel/api/intake.py:99, mel/api/intake.py:282, mel/api/decide.py:212, infra/app.py:133 | none (covered by tests/test_intake.py::test_no_body_field_can_override_identity) |
 | 2 | Cross-org read of a survey or follow-up | closed, because every key starts with `ORG#<org_id>`, ids with `#` are refused, and the JWT claim regexes refuse `#`. See note B for a cross-farmer risk inside one org. | mel/ledger_mem.py:49, mel/ledger_mem.py:60, mel/api/auth.py:24 | none (covered by tests/test_ledger.py::test_cross_org_read_returns_nothing) |
 | 3 | Cap bypass by retrying a failed delivery | **fixed in PR #23**. On main no code called `record_cap` or `cap_count`. PR #23 records the cap in intake when `counts_toward_cap` is true. `record_cap` is idempotent per survey_id, so a retried delivery counts once. PR #23 also checks the cap in `run_decision` before the model call (status `frequency_capped`, high priority exempt). | mel/ledger_ddb.py:220, mel/api/intake.py:304, mel/api/decide.py:246 (main) | tests/review/test_review_cap.py (regression, needs PR #23) |
-| 4 | Duplicate answer overwrites the first | **open**. The first record is never overwritten (conditional put). But a duplicate is found only when the client re-sends the same `response_key`. The pack says a second answer to an answered survey is a duplicate. A new key stores a second answer and a second follow-up. Also the sort key has no survey_id, so one key reused on another survey is a false duplicate. | mel/ledger_ddb.py:184, mel/api/intake.py:295 | tests/review/test_review_duplicates.py |
-| 5 | Opt-out raced by a concurrent attempt | **fixed in PR #23, window narrowed, not atomic**. On main, an opt-out sent during generation, which takes seconds, was lost. PR #23 checks the opt-out again right before `put_survey` and `put_handoff`. A gap of a few milliseconds is left between that check and the writes. To close it fully, write the hand-off in a transaction with a ConditionCheck on OPTOUT, as `put_attempt` already does. | mel/api/decide.py:247, mel/api/decide.py:273 (main), mel/ledger_ddb.py:148 | tests/review/test_review_optout_race.py (regression, needs PR #23) |
+| 4 | Duplicate answer overwrites the first | **fixed in PR #24**. On main a duplicate was found only when the client re-sent the same `response_key`, and a key reused on another survey was a false duplicate. PR #24 writes an `ANSWERED#<survey_id>` marker in the same transaction as a final answer, and puts survey_id in the response sort key. A second answer to an answered survey is now `duplicate` whatever its key. The first record still stands. | mel/ledger_ddb.py:184, mel/api/intake.py:295 (main) | tests/review/test_review_duplicates.py (regression, needs PR #24) |
+| 5 | Opt-out raced by a concurrent attempt | **fixed in PRs #23 and #24**. On main, an opt-out sent during generation, which takes seconds, was lost. #23 checks the opt-out again before the writes. #24 writes the hand-off in a transaction with a ConditionCheck on OPTOUT, as `put_attempt` does, so an opt-out after the re-check also stops it. The survey item can still be stored without a hand-off. It is never sent. | mel/api/decide.py:247, mel/api/decide.py:273 (main), mel/ledger_ddb.py:148 | tests/review/test_review_optout_race.py (2 regression tests, need PRs #23 and #24) |
 | 6 | Jev timeout leads to an accepted survey | closed, because a timeout, transport error, bad status or bad body gives `pending_review=True, ok=False`. The model forbids `ok` with `pending_review`. `generate_survey` accepts only `verdict.ok`. `run_decision` stores nothing unless the status is `accepted`. | mel/judge.py:234, mel/models.py:545, mel/generate.py:185, mel/api/decide.py:259 | none (covered by tests/test_judge.py::test_timeout_retries_then_pending) |
 | 7 | Model-supplied schema_valid trusted | closed, because `merge_draft` keeps only `items` and `rationale` from the draft. `schema_valid` is set after our validator passes, and the other self_eval fields come from Jev scores. | mel/generate.py:215, mel/generate.py:245, mel/generate.py:283 | none (covered by tests/test_generate.py::test_model_schema_valid_true_on_invalid_draft_is_ignored) |
 | 8 | Insight text reaching the system prompt | closed, because the system prompt is a static file read once. Insight and repair errors are JSON in the user turn. Bedrock sends `system` and `user` in separate fields. Jev gets insight text only in `state`, never in the question text. | mel/generate.py:366, mel/generate.py:447, mel/providers/bedrock.py:174, mel/judge.py:257 | none (covered by tests/test_generate.py::test_llm_generator_puts_insight_in_user_turn_only) |
@@ -46,6 +47,6 @@ Result on main at `816b4a7`: 6 open, 9 closed. With integration PR #23: 3 open (
 
 ## Disagreements with the pack
 
-- outcome_codes.json `duplicate_answer` says a second answer to an answered survey is a duplicate. The code finds a duplicate only on the same `response_key` (item 4).
+- outcome_codes.json `duplicate_answer` says a second answer to an answered survey is a duplicate. On main the code finds a duplicate only on the same `response_key` (item 4; fixed in #24).
 - rules.json `frequency_cap` (1 survey per 7 days, high priority exempt) is copied into the hand-off, but our code never counts or checks it (item 3).
 - outcome_codes.json `farmer_opted_out` says to stop all future surveys. No code records the opt-out (note C).

@@ -9,7 +9,7 @@ The step 6 numbers come from `evidence/REPORT.md` on main, from the evals run. R
 ## Before you start (not timed)
 
 - [ ] Open the simulator. LIVE: https://d3eb8n1ufruyva.cloudfront.net . REPLAY: add `?replay=1` to the URL.
-- [ ] Set the server demo clock to the window start for scenario 3. The sim's Jump button moves only the sim clock, not the server clock. Run `.venv/bin/python scripts/e2e_run.py --set-clock <ISO>` for org `org.farmerchat`. Use the `not_before` value in `pack/json/scenarios/3-potato-blight-wait/survey.en-IN.json`. This command is on PR #23.
+- [ ] Set the server demo clock to the window start for scenario 3. The sim's Jump button moves only the sim clock, not the server clock. Run `.venv/bin/python scripts/e2e_run.py --set-clock <ISO>` for org `org.farmerchat`. Use the `not_before` value in `pack/json/scenarios/3-potato-blight-wait/survey.en-IN.json`. The `--set-clock reset` form puts the clock back afterwards.
 - [ ] Sign in with seeded farmer A. The password is in the local seed file only. Keep it off the screen.
 - [ ] Open CloudWatch dashboard `mel-agent` in `us-west-2`.
 - [ ] Open `evidence/REPORT.md`. It is on main.
@@ -28,7 +28,7 @@ If the API is down, switch to REPLAY and say "REPLAY" aloud before step 2.
 
 4. **2:45 to 3:15. Zero-tillage insight: no survey.** Click: in panel 1, choose scenario 6 (zero tillage), then tap Decide. Say: "This is a general question. No advice was given, so there is nothing to check. Rule R3 means no survey." [REPLAY if API down] Presenter note, do not say aloud: rule R3 gives the internal reason `nothing_to_verify` in `mel/rules.yaml`. The no-survey record shows `generic_information`, per CONTRACTS.md.
 
-5. **3:15 to 5:15. Failures.** Click: sign in as farmer B. Set the server clock to scenario 1's window start (its `not_before` in `pack/json/scenarios/1-mustard-aphid-spray/survey.en-IN.json`). Choose scenario 1 (mustard), tap Decide, tap Jump to window start. In the App tab, tap Fail push_token_invalid. On the next channel, answer one question, then tap Close partway. Tap Duplicate submit. Tap Opt out. Tap Decide again. Say: "A bad app token sends the survey to the next channel. If the farmer stops early, the outcome is partial. A duplicate answer is rejected. After opt-out, Decide returns opted out, so no survey is sent." [REPLAY if API down. Farmer B, because farmer A is capped by step 3 and opted out here would block the next run.]
+5. **3:15 to 5:15. Failures.** Click: sign in as farmer B. Set the server clock to scenario 1's window start (its `not_before` in `pack/json/scenarios/1-mustard-aphid-spray/survey.en-IN.json`). Choose scenario 1 (mustard), tap Decide, tap Jump to window start. In the App tab, tap Fail push_token_invalid. On the next channel, answer one question, then tap Close partway. Tap Duplicate submit. Tap Opt out. Tap Decide again. Say: "A bad app token sends the survey to the next channel. If the farmer stops early, the outcome is partial. A duplicate answer is rejected. After opt-out, Decide returns opted out, so no survey is sent." [REPLAY if API down. Farmer B, because farmer A is capped by step 3 and opted out here would block the next run.] Presenter note, do not say aloud: "Duplicate submit" resends the last answer with the same response key, so the server rejects it. Since the fix on main, any later answer to a survey that already has a final answer is also a duplicate. A partial answer followed by a new key is still accepted, so do not answer the survey fully before this step.
 
 6. **5:15 to 6:00. Evidence.** Click: open `evidence/REPORT.md`, then the CloudWatch dashboard `mel-agent`. Tap Mark done. Say: "All 150 golden rows match the rules. All 95 golden send windows match the default timing. All 183 outcome fixtures pass. Each model call takes 2,577 milliseconds at the median and 4,105 milliseconds at the 95th percentile. Cost per accepted survey is $0.000818, with failed calls counted. Prices are unverified, so that cost is an estimate. The model table and the security controls are in the same report."
 
@@ -46,10 +46,10 @@ Steps 1 to 6 take 6:00 in all.
 ## Known gaps
 
 - The sim walkthrough card says to use scenario 3 for step 5. Do not. Scenario 3 starts on the web channel, so the app failure is never reached first. Scenario 1 starts on the app channel. This script uses scenario 1.
-- The routes for follow-ups (`GET /follow-ups`) and for failures and opt-outs (`POST /surveys/{id}/responses` with `kind`) are on PR #23, not on main. The sim uses them.
-- PR #23 says the Lambda path with a sign-in is not traced end to end yet. The trace runs through the AgentCore Runtime. Treat LIVE steps 2 to 5 as untested through the sign-in path until the integration thread confirms.
+- The routes for follow-ups (`GET /follow-ups`) and for failures and opt-outs (`POST /surveys/{id}/responses` with `kind`) are on main. The sim uses them.
+- `KNOWN-ISSUES.md` on main says the Lambda path with a sign-in is not traced end to end yet. The trace runs through the AgentCore Runtime. Treat LIVE steps 2 to 5 as untested through the sign-in path until the integration thread confirms.
 - The server clock is separate from the sim clock. See Before you start.
 - Frequency cap and opt-out persist per farmer. Use a fresh farmer when you rerun.
-- PR #23 notes that pack hand-offs embed the hi-IN survey. The sim shows the en-IN survey. Check on the day which one the sim shows.
+- `KNOWN-ISSUES.md` on main notes that pack hand-offs embed the hi-IN survey. The sim shows the en-IN survey. Check on the day which one the sim shows.
 - Hindi is not built. Only the English survey is shown.
 - Real delivery to any channel is out of scope. Nothing is sent to a farmer.

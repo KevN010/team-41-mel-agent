@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://farmerchat.digitalgreen.org/mel/no_survey.v1.1.schema.json",
+  "title": "No survey (v1.1, proposal)",
+  "description": "Proposed v1.1 of the no_survey record. v1 plus: reason_code accepts the seven golden no-survey codes, and rule_id is required and says which rule decided. Proposal only; not yet agreed with Digital Green. See CONFLICTS.md.",
+  "$comment": "Built from pack/json/schemas/no_survey.schema.json (v1) and pack/data/golden_set.jsonl (expected blocks with survey=false). The reason_code to rule_id pairs are the 1:1 pairs seen in the golden set. The two v1 values (generic_information, needs_more_context) have no golden rule pair, so they are not constrained.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "insight_id",
+    "farmer_id",
+    "decision",
+    "reason_code",
+    "reason",
+    "rule_id"
+  ],
+  "properties": {
+    "insight_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "farmer_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "decision": {
+      "const": "no_survey"
+    },
+    "reason_code": {
+      "description": "Why no survey. The first two values are from v1 and are kept for compatibility. The other seven are the golden no-survey codes.",
+      "enum": [
+        "generic_information",
+        "needs_more_context",
+        "junk_insight",
+        "nothing_to_verify",
+        "no_check_needed",
+        "waiting_for_details",
+        "critical_needs_human_call",
+        "window_after_season",
+        "crop_already_harvested"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "rule_id": {
+      "description": "The rule that decided no survey. R1 to R7 only. R8 is the survey rule in the golden set, so it cannot appear on a no_survey record.",
+      "enum": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "reason_code": { "const": "junk_insight" } }, "required": ["reason_code"] },
+      "then": { "properties": { "rule_id": { "const": "R1" } } }
+    },
+    {
+      "if": { "properties": { "reason_code": { "const": "critical_needs_human_call" } }, "required": ["reason_code"] },
+      "then": { "properties": { "rule_id": { "const": "R2" } } }
+    },
+    {
+      "if": { "properties": { "reason_code": { "const": "nothing_to_verify" } }, "required": ["reason_code"] },
+      "then": { "properties": { "rule_id": { "const": "R3" } } }
+    },
+    {
+      "if": { "properties": { "reason_code": { "const": "waiting_for_details" } }, "required": ["reason_code"] },
+      "then": { "properties": { "rule_id": { "const": "R4" } } }
+    },
+    {
+      "if": { "properties": { "reason_code": { "const": "no_check_needed" } }, "required": ["reason_code"] },
+      "then": { "properties": { "rule_id": { "const": "R5" } } }
+    },
+    {
+      "if": { "properties": { "reason_code": { "const": "window_after_season" } }, "required": ["reason_code"] },
+      "then": { "properties": { "rule_id": { "const": "R6" } } }
+    },
+    {
+      "if": { "properties": { "reason_code": { "const": "crop_already_harvested" } }, "required": ["reason_code"] },
+      "then": { "properties": { "rule_id": { "const": "R7" } } }
+    }
+  ]
+}

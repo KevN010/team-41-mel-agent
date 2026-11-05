@@ -24,15 +24,17 @@ Every NOTES-*.md item is either fixed in this branch (marked FIXED) or listed as
 - **Simulator clock vs server clock.** In LIVE mode the page's virtual clock is not sent to the server
   (no time field, by design). The server has a demo clock per org (`mel/democlock.py`), moved only through
   the AgentCore admin action `clock`: `.venv/bin/python scripts/e2e_run.py --set-clock <ISO>` (org.farmerchat).
-- **Duplicates keyed on the client response_key** (review item 4, NOTES-J). A second answer with a new key
-  is stored as a second record; the same key on another survey collides (RESPONSE sk has no survey id).
-  Needs a ledger key change (`RESPONSE#<survey_id>#<key>`) and a protocol change. Not done.
+- **Review item 13, documented, not fixed:** the token bucket is per process. Jev now takes a token from
+  it, but Lambda scales out and each instance has its own bucket, and Lambda concurrency is not pinned.
+  So the 60/min limit holds per instance, not per account. A real global limit needs reserved
+  concurrency 1 on mel-api (infra) or a shared counter (for example DynamoDB).
+- **Review item 10, Bedrock IAM:** the narrower InvokeModel resources (only the models.yaml profiles) are
+  written up but not applied. Editing infra/app.py was blocked by this session's permission guard.
 - **Follow-ups read is org-wide, filtered in code.** `list_follow_ups(org)` queries GSI1 for the whole org;
   the service keeps only the caller's farmer. Output is scoped; the read is not. Needs a ledger method.
 - **AgentCore callers assert identity.** Any IAM principal allowed `InvokeAgentRuntime` can act for any
   farmer and move any org's demo clock. Restrict that permission to FarmerChat and the operator (infra).
-- **Opt-out race narrowed, not closed.** `run_decision` re-checks the opt-out after generation, just before
-  the survey and hand-off writes. A conditional write on the OPTOUT item would close it (ledger change).
+- **Response items written before this change** keep the old `RESPONSE#<key>` sort key (only the e2e orgs).
 - **Frequency cap uses a fresh org per e2e run.** The cap is now counted and enforced, so a second potato
   run for the same farmer inside 7 days is `frequency_capped`. `scripts/e2e_run.py` uses `org.e2e-<stamp>`.
 - **Jev margin.** `matches_advice` was 0.52 on the pack's own potato survey (threshold 0.5) and 0.97 on the
@@ -69,7 +71,12 @@ Every NOTES-*.md item is either fixed in this branch (marked FIXED) or listed as
 - Review (b): follow-ups returned only for the caller's farmer.
 - Review item 3 / NOTES-J: counted outcomes call `record_cap`; `run_decision` checks `cap_count` before any
   model call (status `frequency_capped`, high priority exempt).
-- Review item 5: opt-out re-checked after generation (see Open for the remaining window).
+- Review item 5: opt-out re-checked after generation, and `put_handoff` is a transaction with a
+  ConditionCheck on the OPTOUT item. It raises `FarmerOptedOut`, and run_decision returns `opted_out`.
+- Review item 4: a final answer (completed or negative_outcome) writes `ANSWERED#<survey_id>` in the
+  same transaction as the response. A later answer for that survey with any response_key is a
+  duplicate, the first answer stands, and no follow-up is raised. Partial then complete is still
+  allowed. Response sort key is `RESPONSE#<key>#<survey_id>`, so the same key on two surveys is two records.
 - Review: nothing called `set_opt_out`; the opt-out route and the opt_out event do now.
 - Review item 13 (part): Jev calls take a token from the shared 60/min bucket.
 - Security pass on this diff: survey reads answer 404 for another farmer's id (no id oracle); decide replies

@@ -4,8 +4,10 @@
   arguments are additions to the prompt's signature. R8's `send_window` comes from `window_fn`;
   the default lazily imports `mel.timing.send_window(insight, profile, clock, rules)` and returns
   `None` when that module does not exist yet (wave 1 B). Integration should check the default
-  wiring once B has merged. A `TimingException` from B is not caught here; `rules_v1` can raise it
-  for an R8 row. Integration decides what that maps to.
+  wiring once B has merged. B's `send_window` returns a `TimingException` (it does not raise). If R8 gets
+  one back (either code, `window_after_season` or `window_too_narrow`), `decide` returns
+  R6 / `window_after_season`, a no-survey record. `golden_v1` never does this on the golden set
+  because R6 already catches those rows. Only `rules_v1` can produce `window_too_narrow`.
 - `DecisionRecord.created_at` is the decision time (`clock.now()`), not the insight's `created_at`.
 - R6 compares dates: created date + lo days of the timing bucket, strictly after 2027-03-31.
   For timing `none` the start is created + action_window_days (default 2 when null) + 1 day.

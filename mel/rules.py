@@ -32,7 +32,9 @@ from mel.validate import validate_against_pack
 
 RULES_FILE = Path(__file__).with_name("rules.yaml")
 
-WindowFn = Callable[[Insight, TimingProfile, Clock, Mapping[str, Any]], SendWindow | None]
+# A window function returns the window, None (no window available), or an Exception instance
+# (mel.timing.TimingException, returned not raised) when no valid window exists.
+WindowFn = Callable[[Insight, TimingProfile, Clock, Mapping[str, Any]], "SendWindow | Exception | None"]
 
 
 @dataclass(frozen=True)
@@ -169,14 +171,17 @@ def _ident(raw: Mapping[str, Any], key: str) -> str:
 
 def _default_window_fn(
     insight: Insight, profile: TimingProfile, clock: Clock, rules: Mapping[str, Any]
-) -> SendWindow | None:
-    """mel.timing.send_window if wave 1 B has landed, else no window (None)."""
+) -> SendWindow | Exception | None:
+    """mel.timing.send_window if wave 1 B has landed, else no window (None).
+
+    send_window returns a TimingException (codes window_after_season, window_too_narrow)
+    instead of raising it; it is passed through for decide() to handle.
+    """
     try:
         from mel.timing import send_window
     except ImportError:
         return None
-    result = send_window(insight, profile, clock, rules)
-    return result if isinstance(result, SendWindow) else None
+    return send_window(insight, profile, clock, rules)
 
 
 def decide(
@@ -192,6 +197,8 @@ def decide(
 
     ``profile`` defaults to settings.TIMING_PROFILE. For R8 the send window comes from
     ``window_fn`` (default: mel.timing.send_window when that module exists, else None).
+    If the window function returns an Exception (a TimingException: no valid window exists
+    in the season), the decision becomes R6 / window_after_season, a no-survey record.
     ``created_at`` on the record is the decision time, ``clock.now()``.
     """
     profile = profile or settings.TIMING_PROFILE
@@ -206,7 +213,11 @@ def decide(
     window = None
     if rule.id == "R8":
         assert parsed is not None  # R1 catches None
-        window = (window_fn or _default_window_fn)(parsed, profile, clock, rules)
+        result = (window_fn or _default_window_fn)(parsed, profile, clock, rules)
+        if isinstance(result, Exception):
+            rule = next(r for r in load_rule_table() if r.id == "R6")
+        else:
+            window = result
 
     return DecisionRecord(
         insight_id=_ident(raw, "insight_id"),

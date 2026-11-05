@@ -204,3 +204,19 @@ def test_no_survey_rules_never_call_window_fn(clock, crop_calendar, rules):
 def test_decision_time_is_clock_time(clock, crop_calendar, rules):
     d = decide(make(), clock, crop_calendar, rules, window_fn=lambda *a: None)
     assert d.created_at == clock.now()
+
+
+class FakeTimingException(Exception):
+    """Stands in for mel.timing.TimingException, which is returned, not raised."""
+
+    def __init__(self, code):
+        super().__init__(code)
+        self.code = code
+
+
+@pytest.mark.parametrize("code", ["window_after_season", "window_too_narrow"])
+def test_timing_exception_returned_becomes_r6(clock, crop_calendar, rules, code):
+    d = decide(make(), clock, crop_calendar, rules, profile="rules_v1",
+               window_fn=lambda *a: FakeTimingException(code))
+    assert (d.survey, d.rule_id, d.reason_code, d.send_window) == (False, "R6", "window_after_season", None)
+    assert d.timing_profile == "rules_v1"

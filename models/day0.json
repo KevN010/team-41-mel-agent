@@ -1,0 +1,66 @@
+{
+  "global.openai.gpt-6-luna": {
+    "ok": true,
+    "text": "OK",
+    "usage": {
+      "inputTokens": 13,
+      "outputTokens": 5,
+      "totalTokens": 18,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    },
+    "ms": 527
+  },
+  "global.openai.gpt-6.1-terra": {
+    "ok": false,
+    "error": "An error occurred (AccessDeniedException) when calling the Converse operation: Model access is denied due to Not authorized to perform action due to private marketplace eligibility. Your AWS Marketplace subscription for this model cannot be completed at this time. If you recently fixed this issue, t"
+  },
+  "global.anthropic.claude-haiku-4-5-20251001-v1:0": {
+    "ok": true,
+    "text": "OK",
+    "usage": {
+      "inputTokens": 14,
+      "outputTokens": 4,
+      "totalTokens": 18,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    },
+    "ms": 575
+  },
+  "us.anthropic.claude-haiku-4-5-20251001-v1:0": {
+    "ok": true,
+    "text": "OK",
+    "usage": {
+      "inputTokens": 14,
+      "outputTokens": 4,
+      "totalTokens": 18,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    },
+    "ms": 601
+  },
+  "global.anthropic.claude-haiku-5-5": {
+    "ok": true,
+    "text": "OK",
+    "usage": {
+      "inputTokens": 18,
+      "outputTokens": 4,
+      "totalTokens": 22,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    },
+    "ms": 875
+  },
+  "us.anthropic.claude-haiku-5-5": {
+    "ok": true,
+    "text": "OK",
+    "usage": {
+      "inputTokens": 18,
+      "outputTokens": 4,
+      "totalTokens": 22,
+      "cacheReadInputTokens": 0,
+      "cacheWriteInputTokens": 0
+    },
+    "ms": 904
+  }
+}

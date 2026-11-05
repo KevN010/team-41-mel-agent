@@ -22,7 +22,6 @@ ModelTokens{model_id,direction}, CostUsd{step}, JudgeVerdicts{verdict}.
 
 from __future__ import annotations
 
-import inspect
 import logging
 import time
 from collections.abc import Callable, Iterable, Mapping
@@ -150,21 +149,8 @@ def _call_generate(
     fn: Callable[..., Any], insight: Insight, decision: DecisionRecord, window: SendWindow,
     language: str, deps: DecideDeps, seq: int,
 ) -> Any:
-    """generate_survey(insight, decision, window, language, generator, judge, clock) plus the
-    ledger sequence number under whichever keyword the generator names it (agent G, NOTES-J)."""
-    kwargs: dict[str, Any] = {}
-    try:
-        params = inspect.signature(fn).parameters
-    except (TypeError, ValueError):
-        params = {}
-    for name in ("survey_seq", "seq", "sequence"):
-        if name in params:
-            kwargs[name] = seq
-            break
-    else:
-        if "survey_id" in params:
-            kwargs["survey_id"] = f"S-{seq:05d}"
-    return fn(insight, decision, window, language, deps.generator, deps.judge, deps.clock, **kwargs)
+    """generate_survey(insight, decision, window, language, generator, judge, clock, *, survey_seq)."""
+    return fn(insight, decision, window, language, deps.generator, deps.judge, deps.clock, survey_seq=seq)
 
 
 # --------------------------------------------------------------------------- helpers

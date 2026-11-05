@@ -17,7 +17,7 @@
 - Event passed to `apply_event` has one key beyond D's contract: `sheet_outcome` (app/web only). D needs it to choose partial vs completed and `closed_partway`/`interrupted`. `raw` is always None.
 - Partial then complete are two responses with two `response_key`s (`delivery_attempt` 2). The ledger has no list-by-survey call, so intake does not merge answers across keys.
 - Follow-up: `put_follow_up` first (source of truth), then SQS. An SQS failure is logged (class name only) and does not fail the request; a retry would only get `duplicate` and never re-enqueue. Integration should replay from `list_follow_ups`.
-- `generate_survey` has no sequence parameter in the G prompt, but G says the id comes from the ledger sequence. `decide._call_generate` passes `survey_seq`, `seq`, `sequence` or `survey_id` (`S-%05d`), whichever the function names. Check against G's final signature.
+- `decide.py` calls `generate_survey(insight, decision, window, language, generator, judge, clock, survey_seq=<ledger.next_survey_seq>)`, matching G's final signature (PR #15). `models` is left to its default.
 - `TimingException` may be returned or raised; both are handled (matched by class name).
 - `run_decision` additions beyond the prompt: opt-out check before any model call (status `opted_out`); the cap is not checked here. Not persisted: the DecisionRecord (no ledger method), and surveys with status failed_review or pending_review (nothing is sent).
 - `survey_closed`/`survey_replaced` (stale taps) are not enforced in intake; the Survey record has no expiry, the hand-off does.

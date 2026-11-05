@@ -603,7 +603,7 @@ def test_step_order_and_generate_receives_language_and_sequence(deps_factory, sc
     deps.decide_fn = lambda *a: (order.append("rules"), spy.decide(*a))[1]
     deps.window_fn = lambda *a: (order.append("timing"), spy.window(*a))[1]
 
-    def generate(insight, decision, window, language, generator, judge, clock, survey_seq=None):
+    def generate(insight, decision, window, language, generator, judge, clock, *, survey_seq):
         order.append("generate")
         assert (language, survey_seq) == ("en-IN", 1) and decision.send_window == window
         return spy.generate(insight)
@@ -752,7 +752,7 @@ def test_language_falls_back_to_first_allowed(deps_factory, sc3, sc3_me):
     ins = {**sc3["insight"], "conversation_language": "hi-IN"}
     seen = {}
 
-    def gen(insight, decision, window, language, generator, judge, clock):
+    def gen(insight, decision, window, language, generator, judge, clock, *, survey_seq):
         seen["language"] = language
         return SimpleNamespace(status="failed_review", survey=None, attempts=1, reasons=[], cost_usd=0.0, usage=[])
 

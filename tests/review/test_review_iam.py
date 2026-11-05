@@ -38,7 +38,6 @@ def test_no_unused_dynamodb_actions():
     assert unused == []
 
 
-@pytest.mark.xfail(strict=True, reason="REVIEW item 10: Bedrock resources wider than models.yaml")
 def test_bedrock_resources_name_the_chosen_profile():
     assert 'resource="inference-profile", resource_name="*"' not in APP
     assert "foundation-model/anthropic.*" not in APP

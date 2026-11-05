@@ -266,7 +266,11 @@ class BedrockChat:
         response = self._call(request)
         latency_ms = (time.perf_counter() - started) * 1000.0
         usage_in = response.get("usage") or {}
-        in_tok = int(usage_in.get("inputTokens", 0))
+        # OpenAI on Bedrock reports cached prompt tokens apart from inputTokens (live: inputTokens=2).
+        # Count them at the full rate, as evals/model_select.py does: cost is an upper bound.
+        in_tok = int(usage_in.get("inputTokens", 0)) + int(usage_in.get("cacheReadInputTokens", 0)) + int(
+            usage_in.get("cacheWriteInputTokens", 0)
+        )
         out_tok = int(usage_in.get("outputTokens", 0))
         cost = compute_cost(self.spec, in_tok, out_tok)
         usage = Usage(

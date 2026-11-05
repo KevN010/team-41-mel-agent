@@ -24,6 +24,9 @@ from mel.models import Insight, JudgeVerdict, Survey
 log = logging.getLogger("mel.wiring")
 
 JEV_KEY_TTL_S = 300.0
+# System One rejects a request without "model" (HTTP 422, checked live 2026-11-05). docs.typesafe.ai
+# lists jev-latest as the general-purpose model. JEV_MODEL overrides it.
+DEFAULT_JEV_MODEL = "jev-latest"
 PLACEHOLDERS = {"", "REPLACE_ME", "replace_me", "CHANGEME"}
 SSM_NAMES = {
     "MEL_TABLE": "table_name",
@@ -107,7 +110,7 @@ class RefreshingJevJudge:
             if self._judge is None or time.monotonic() - self._loaded_at > self._ttl_s:
                 key = self._key()
                 # api_key="" (not None) keeps JevJudge from falling back to settings.JEV_API_KEY.
-                self._judge = JevJudge(api_key=key or "")
+                self._judge = JevJudge(api_key=key or "", model=os.environ.get("JEV_MODEL") or DEFAULT_JEV_MODEL)
                 self._loaded_at = time.monotonic()
             return self._judge
 

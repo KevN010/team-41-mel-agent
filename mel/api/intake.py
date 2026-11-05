@@ -13,8 +13,7 @@ ResponseRecord (status completed, partial, negative_outcome, duplicate, or stale
 
 Duplicates: the ledger decides. put_response is idempotent on response_key and returns
 DUPLICATE; the first record stays untouched. Intake then asks apply_event (agent D) only to
-shape the duplicate record (attempt.already_answered plus existing=first). The same event
-replayed at the same instant returns the first record unchanged (D's transport-retry rule).
+shape the duplicate record (same event plus failure_code "duplicate_answer").
 
 Rejection codes
   invalid_request   400  payload is not valid JSON-shape (extra key, wrong type, bad survey id)
@@ -294,13 +293,10 @@ def submit_response(
 
     # Duplicate detection belongs to the ledger: put_response is idempotent on response_key.
     if ledger.put_response(org, record) is PutOutcome.DUPLICATE:
-        first = ledger.get_response(org, farmer, body.response_key)
-        # The state machine only shapes the duplicate record. The first record stays untouched.
-        dup_attempt = {**attempt.model_dump(mode="json"), "already_answered": True}
-        dup = _build(build, survey, dup_attempt, event, clock, codes, existing=first)
+        # The state machine only shapes the duplicate record; the first record stays untouched.
+        dup = _build(build, survey, attempt, {**event, "failure_code": "duplicate_answer"}, clock, codes)
         ok, _errors = validate_against_pack(dup, "response")
-        replay = first is not None and dup == first  # same event again: D returns the first record as is
-        if not ok or dup.farmer_id != farmer or not (dup.status == "duplicate" or replay):
+        if not ok or dup.farmer_id != farmer or dup.status != "duplicate":
             log.error("intake produced an invalid duplicate record")
             raise IntakeError("internal_error")
         return dup

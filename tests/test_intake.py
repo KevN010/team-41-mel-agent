@@ -105,7 +105,7 @@ class MemLedger:
     def is_opted_out(self, org_id, farmer_id): return False
 
 
-def _duplicate_shape(survey, attempt, event, existing, now, codes):
+def _duplicate_shape(survey, attempt, event, now, codes):
     """Shape of a duplicate_answer record, as in pack/json/outcomes/*/duplicate_answer.json."""
     rule = codes["failures"]["duplicate_answer"]
     items = []
@@ -117,13 +117,12 @@ def _duplicate_shape(survey, attempt, event, existing, now, codes):
         else:
             items.append({"item_id": item.item_id, "item_type": item.type, "result": "not_reached",
                           "value": None, "raw_input": None, "input_kind": None, "attempts": 0})
-    stamps = existing.timestamps.to_pack() if existing else {"sent": None, "delivered": None, "opened": None}
-    stamps["answered"] = now.isoformat(timespec="seconds")
+    stamps = {"sent": None, "delivered": None, "opened": None, "answered": now.isoformat(timespec="seconds")}
     return ResponseRecord.model_validate({
-        "response_key": attempt["response_key"], "survey_id": survey.survey_id, "farmer_id": survey.farmer_id,
-        "source_insight_ids": survey.source_insight_ids, "channel": attempt["channel"],
+        "response_key": attempt.response_key, "survey_id": survey.survey_id, "farmer_id": survey.farmer_id,
+        "source_insight_ids": survey.source_insight_ids, "channel": attempt.channel,
         "language": survey.language, "status": rule["status"], "failure_code": "duplicate_answer",
-        "answers": {}, "items": items, "complete": False, "delivery_attempt": attempt["delivery_attempt"],
+        "answers": {}, "items": items, "complete": False, "delivery_attempt": attempt.delivery_attempt,
         "timestamps": stamps, "recorded_at": now, "answered_by": survey.farmer_id,
         "sheet_outcome": event.get("sheet_outcome"), "raw_event": None,
         "retry_decision": rule["retry_decision"], "retry_after_minutes": rule["retry_after_minutes"],
@@ -133,16 +132,14 @@ def _duplicate_shape(survey, attempt, event, existing, now, codes):
     })
 
 
-def fake_apply_event(survey, attempt, event, clock, codes, *, existing=None):
-    """Follows the apply_event contract (agent D) for answer events. The duplicate path mirrors D:
-    it fires when the attempt dict says already_answered or ``existing`` holds answers."""
+def fake_apply_event(survey, attempt, event, clock, codes):
+    """Follows the apply_event contract (agent D) for answer events. As in D, the caller supplies
+    failure_code "duplicate_answer" and the double only builds the duplicate record shape."""
     assert event["kind"] == "answer"
     assert event["farmer_id"] == survey.farmer_id  # intake must pass the JWT farmer
     now = clock.now()
-    if existing is not None and existing.timestamps.answered == now:
-        return existing  # same event again (transport retry): the first record, unchanged
-    if isinstance(attempt, dict) and (attempt.get("already_answered") or (existing and existing.answers)):
-        return _duplicate_shape(survey, attempt, event, existing, now, codes)
+    if event.get("failure_code") == "duplicate_answer":
+        return _duplicate_shape(survey, attempt, event, now, codes)
     answers = dict(event["answers"])
     reasons: list[str] = []
     items = []
@@ -332,31 +329,20 @@ def test_duplicate_is_detected_by_put_response_and_shaped_by_apply_event(me, led
     first = submit(me, ledger, clock, codes, queue)
     seen = []
 
-    def spy(survey, attempt, event, clock_, codes_, *, existing=None):
-        seen.append((attempt, existing))
-        return fake_apply_event(survey, attempt, event, clock_, codes_, existing=existing)
+    def spy(survey, attempt, event, clock_, codes_):
+        seen.append(event.get("failure_code"))
+        return fake_apply_event(survey, attempt, event, clock_, codes_)
 
-    clock.advance(timedelta(minutes=1))
     again = submit_response(me, SURVEY_ID, payload(), ledger, clock, codes, apply_event=spy, queue=queue)
     assert again.status == "duplicate"
-    (first_call, second_call) = seen
-    assert not hasattr(first_call[0], "get") and first_call[1] is None  # first pass: no pre-check
-    assert second_call[0]["already_answered"] is True and second_call[1] == first
+    assert seen == [None, "duplicate_answer"]  # first pass is a normal event; no pre-check of the ledger
     assert ledger.get_response(ORG, FARMER, "rk-1") == first
 
 
-def test_same_event_again_replays_the_first_record(me, ledger, clock, codes, queue, sqs):
-    first = submit(me, ledger, clock, codes, queue, payload(answers={"q1": "yes", "q2": "spreading", "q3": 3}))
-    again = submit(me, ledger, clock, codes, queue, payload(answers={"q1": "yes", "q2": "spreading", "q3": 3}))
-    assert again == first and len(ledger.responses) == 1 and len(sqs.sent) == 1
-
-
 def test_duplicate_of_a_record_without_answers_is_still_duplicate(me, ledger, clock, codes, queue):
-    """The first record under this key holds no answers (a failure record). put_response still says
-    DUPLICATE, so the caller gets a duplicate and the first record stays."""
+    """put_response is the only detector: any stored record under the key makes a repeat a duplicate."""
     first = submit(me, ledger, clock, codes, queue, payload(answers={"q1": "yes"}))
     ledger.responses[(ORG, FARMER, "rk-1")] = first.model_copy(update={"answers": {}})
-    clock.advance(timedelta(minutes=1))
     again = submit(me, ledger, clock, codes, queue)
     assert again.status == "duplicate" and ledger.responses[(ORG, FARMER, "rk-1")].answers == {}
 

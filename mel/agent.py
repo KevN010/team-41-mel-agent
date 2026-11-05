@@ -39,9 +39,12 @@ def handle(request: Any, services: Services | None = None) -> dict[str, Any]:
     except Unauthorized:
         return {"status": 401, "body": {"error": "unauthorized"}}
     if services is None:
-        from mel.api.wiring import get_services
+        try:
+            from mel.api.wiring import get_services
 
-        services = get_services()
+            services = get_services()
+        except Exception:  # noqa: BLE001 - config or AWS client failure
+            return {"status": 500, "body": {"error": "internal_error"}}
     reply: Reply = dispatch(str(request.get("action")), identity, request.get("payload") or {}, services, admin=True)
     return {"status": reply.status, "body": reply.body}
 

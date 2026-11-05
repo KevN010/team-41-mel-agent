@@ -102,7 +102,8 @@ def _decision_body(result: DecisionResult) -> dict[str, Any]:
         "no_survey": _json(result.no_survey),
         "survey": _json(result.survey),
         "handoff": _json(result.handoff),
-        "reasons": list(result.reasons),
+        # Reason codes only: "generator_error:ThrottlingException" -> "generator_error". Details stay in logs.
+        "reasons": sorted({r.split(":", 1)[0] for r in result.reasons}),
         "cost_usd": result.cost_usd,
     }
 
@@ -141,7 +142,13 @@ def _survey_id(payload: Any) -> str:
 
 
 def _get_survey(identity: Identity, payload: Any, svc: Services) -> Reply:
-    survey = _load_survey(identity, _survey_id(payload), svc.ledger)
+    try:
+        survey = _load_survey(identity, _survey_id(payload), svc.ledger)
+    except IntakeError as exc:
+        # Survey ids are sequential: a read must not tell "someone else's" from "does not exist".
+        if exc.code == "identity_mismatch":
+            raise IntakeError("unknown_survey") from None
+        raise
     return Reply(200, {"survey": _json(survey)})
 
 
@@ -188,14 +195,14 @@ def _clock(identity: Identity, payload: Any, svc: Services) -> Reply:
             clock.set(to_ist(datetime.fromisoformat(at)))
         elif op == "advance":
             seconds = payload.get("seconds")
-            if isinstance(seconds, bool) or not isinstance(seconds, int):
+            if isinstance(seconds, bool) or not isinstance(seconds, int) or abs(seconds) > 10**9:
                 raise IntakeError("invalid_request")
             clock.advance(timedelta(seconds=seconds))
         elif op == "reset":
             clock.reset()
         elif op != "get":
             raise IntakeError("invalid_request")
-    except ValueError:  # naive or malformed time, negative advance, offset out of range
+    except (ValueError, OverflowError):  # naive or malformed time, negative advance, out of range
         raise IntakeError("invalid_request") from None
     log.info("demo clock", extra={"op": op, "offset_s": int(clock.offset.total_seconds())})
     return Reply(200, {"now": clock.now().isoformat(), "offset_s": int(clock.offset.total_seconds())})

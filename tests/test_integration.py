@@ -220,7 +220,7 @@ def test_opt_out_route(svc):
 
 def test_other_farmer_cannot_read_or_answer(svc, scheduled):
     status, body = _call(svc, "GET /surveys/{id}", survey_id=scheduled, farmer="F-000999")
-    assert status == 403 and body == {"error": "identity_mismatch"}
+    assert status == 404 and body == {"error": "unknown_survey"}  # no existence oracle on reads
     status, body = _call(svc, "POST /surveys/{id}/responses", {
         "response_key": "x", "channel": "app", "answers": {"q1": "yes"}}, survey_id=scheduled, farmer="F-000999")
     assert status == 403
@@ -254,6 +254,10 @@ def test_handler_rejects_bad_requests(svc):
     assert handler.handle(_event("POST /surveys/decide"), svc)["statusCode"] == 400  # no body
     status, _ = _call(svc, "GET /surveys/{id}", survey_id="../../etc")
     assert status == 400
+    ev["body"] = "[" * 100000 + "]" * 100000
+    assert handler.handle(ev, svc)["statusCode"] == 400
+    ev["body"] = "[" * 20000 + "]" * 20000
+    assert handler.handle(ev, svc)["statusCode"] in (200, 400)
 
 
 def test_base64_body(svc, scenarios):
@@ -282,7 +286,8 @@ def test_agent_clock_validation(svc):
     ident = {"farmer_id": "F-000245", "org_id": ORG}
     for payload in ({"op": "set", "at": "2027-01-09T07:00:00"},  # naive
                     {"op": "advance", "seconds": -5}, {"op": "advance", "seconds": True},
-                    {"op": "set", "at": "2099-01-01T00:00:00+05:30"}, {"op": "jump"}):
+                    {"op": "set", "at": "2099-01-01T00:00:00+05:30"}, {"op": "jump"},
+                    {"op": "advance", "seconds": 10**30}):
         assert agent.handle({"action": "clock", "identity": ident, "payload": payload}, svc)["status"] == 400
     assert agent.handle({"action": "clock", "identity": ident, "payload": {"op": "reset"}}, svc)["body"]["offset_s"] == 0
 

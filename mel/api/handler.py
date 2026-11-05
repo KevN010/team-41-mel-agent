@@ -53,6 +53,8 @@ def _body(event: Mapping[str, Any]) -> Any:
     raw = event.get("body")
     if raw is None or raw == "":
         raise BadRequest
+    if not isinstance(raw, str) or len(raw) > MAX_BODY_BYTES * 4 // 3 + 4:
+        raise BadRequest
     if event.get("isBase64Encoded"):
         try:
             raw = base64.b64decode(raw, validate=True).decode("utf-8")
@@ -62,7 +64,7 @@ def _body(event: Mapping[str, Any]) -> Any:
         raise BadRequest
     try:
         return json.loads(raw)
-    except ValueError:
+    except (ValueError, RecursionError):
         raise BadRequest from None
 
 
@@ -89,9 +91,13 @@ def handle(event: Mapping[str, Any], services: Services | None = None) -> dict[s
     except BadRequest:
         return _response(Reply(400, {"error": "invalid_request"}))
     if services is None:
-        from mel.api.wiring import get_services
+        try:
+            from mel.api.wiring import get_services
 
-        services = get_services()
+            services = get_services()
+        except Exception as exc:  # noqa: BLE001 - config or AWS client failure; class name only
+            log.error("service setup failed", extra={"error_class": type(exc).__name__})
+            return _response(Reply(500, {"error": "internal_error"}))
     reply = dispatch(action, identity, payload, services)
     log.info("request", extra={"route": route, "action": action, "http_status": reply.status,
                                "request_id": request_id})

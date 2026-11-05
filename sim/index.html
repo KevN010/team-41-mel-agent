@@ -121,6 +121,7 @@ footer{max-width:1100px;margin:0 auto;padding:0 16px 24px;font-size:.8rem;color:
       <div class="grid2">
         <div><label for="route-decide">POST decide</label><input type="text" id="route-decide"></div>
         <div><label for="route-respond">POST response</label><input type="text" id="route-respond"></div>
+        <div><label for="route-events">POST failure, decline, opt-out (not in J's intake yet)</label><input type="text" id="route-events"></div>
         <div><label for="route-followups">GET follow-ups</label><input type="text" id="route-followups"></div>
       </div>
     </details>
@@ -427,7 +428,12 @@ function normalizeDecide(body) {
     suppressed = { reason: 'farmer_opted_out' };
   }
   if (suppressed === true) suppressed = { reason: 'farmer_opted_out' };
-  return { decision: d, survey: survey, handoff: handoff, noSurvey: noSurvey, suppressed: suppressed };
+  const status = typeof body.status === 'string' ? body.status : null;
+  if (!suppressed && status === 'opted_out') suppressed = { reason: 'farmer_opted_out' };
+  // run_decision statuses: survey_scheduled, no_survey, timing_exception, opted_out, failed_review, pending_review
+  const notSent = status && ['timing_exception', 'failed_review', 'pending_review'].indexOf(status) >= 0 ? status : null;
+  return { decision: d, survey: survey, handoff: handoff, noSurvey: noSurvey, suppressed: suppressed, status: status, notSent: notSent,
+    reasons: Array.isArray(body.reasons) ? body.reasons : [] };
 }
 
 /** Is the survey reachable on this channel at this virtual time? */
@@ -435,6 +441,7 @@ function gateFor(ctx) {
   const d = ctx.decided;
   if (!d) return { open: false, reason: 'No decision yet. Pick a scenario and tap Decide.' };
   if (d.suppressed) return { open: false, reason: 'Suppressed: the farmer opted out. No survey is sent.' };
+  if (d.notSent) return { open: false, reason: 'Nothing is sent: decision status is ' + d.notSent + '.' };
   if (!d.survey) return { open: false, reason: 'Decision: no survey. Nothing is sent.' };
   const w = d.survey.send_window;
   const t = ctx.clock;
@@ -462,7 +469,7 @@ function nextChannel(handoff, current) {
 const PACK = JSON.parse(document.getElementById('pack-data').textContent);
 const CODES = PACK.codes;
 
-const DEFAULT_ROUTES = { decide: '/surveys/decide', respond: '/surveys/{survey_id}/responses', followups: '/follow-ups' };
+const DEFAULT_ROUTES = { decide: '/surveys/decide', respond: '/surveys/{survey_id}/responses', events: '/surveys/{survey_id}/events', followups: '/follow-ups' };
 const STEP5 = [
   ['pushfail', 'push_token_invalid, falls back'],
   ['partial', 'closed partway, partial'],
@@ -521,6 +528,10 @@ function h(tag, props) {
     });
   }
   return e;
+}
+/** append that skips null and false (Node.append would write the text "null"). */
+function add(parent) {
+  for (let i = 1; i < arguments.length; i++) { const c = arguments[i]; if (c != null && c !== false) parent.append(c); }
 }
 function $(s) { return document.querySelector(s); }
 function mount(sel, node) { const t = $(sel); t.replaceChildren(node); }
@@ -636,12 +647,12 @@ function replayDecide() {
   if (!s.survey) {
     return {
       decision: Object.assign({}, base, { survey: false, rule_id: 'R3', reason_code: 'nothing_to_verify', send_window: null }),
-      survey: null, handoff: null, noSurvey: s.no_survey, suppressed: null,
+      status: 'no_survey', survey: null, handoff: null, noSurvey: s.no_survey, suppressed: null,
     };
   }
   return {
     decision: Object.assign({}, base, { survey: true, rule_id: 'R8', reason_code: null, send_window: s.survey.send_window }),
-    survey: s.survey, handoff: s.handoff, noSurvey: null,
+    status: state.optedOut ? 'opted_out' : 'survey_scheduled', survey: s.survey, handoff: s.handoff, noSurvey: null,
     suppressed: state.optedOut ? { reason: 'farmer_opted_out' } : null,
   };
 }
@@ -656,7 +667,10 @@ async function doDecide() {
       out = replayDecide();
       if (out.survey) { delete state.answeredSurveys[out.survey.survey_id]; Object.keys(state.seenKeys).forEach(function (k) { if (k.indexOf('rk-' + out.survey.survey_id + '-') === 0) delete state.seenKeys[k]; }); }
     } else {
-      const r = await api('POST', 'decide', {}, { insight: sc().insight });
+      // The server needs insight.farmer_id == the JWT farmer (else 403 identity_mismatch). Use the token's farmer for the demo.
+      const body = JSON.parse(JSON.stringify(sc().insight));
+      if (state.claims && state.claims['custom:farmer_id']) body.farmer_id = state.claims['custom:farmer_id'];
+      const r = await api('POST', 'decide', {}, body);
       if (r.status === 403 || r.status === 409) {
         const n = normalizeDecide(r.body);
         if (n.suppressed) { out = n; }
@@ -665,7 +679,7 @@ async function doDecide() {
         if (!r.ok) throw new Error(describeError(r));
         out = normalizeDecide(r.body);
         if (!out.decision) throw new Error('The decide response had no decision record.');
-        if (out.decision.survey && !out.survey) throw new Error('Decision says survey, but the response carries no survey.');
+        if (out.decision.survey && !out.survey && !out.notSent && !out.suppressed) throw new Error('Decision says survey, but the response carries no survey.');
       }
     }
     state.decided = out;
@@ -725,7 +739,11 @@ async function sendResponse(payload, meta) {
       state.seenKeys[payload.response_key] = true;
       if (['completed', 'partial', 'negative_outcome'].indexOf(rec.status) >= 0) state.answeredSurveys[survey().survey_id] = true;
     } else {
-      const r = await api('POST', 'respond', { survey_id: survey().survey_id }, payload);
+      const isAnswer = payload.kind === 'answer';
+      const r = await api('POST', isAnswer ? 'respond' : 'events', { survey_id: survey().survey_id }, wirePayload(payload));
+      if (!isAnswer && (r.status === 404 || r.status === 405) && !(r.body && r.body.error)) {
+        throw new Error('This API has no route for failures, declines or opt-outs (' + routeTemplate('events') + '). Intake only takes answers. See NOTES-L.md.');
+      }
       if (!r.ok && !(r.body && r.body.status)) throw new Error(describeError(r));
       rec = (r.body && r.body.response) || r.body;
       if (!rec || !rec.status) throw new Error('The response route returned no status. ' + describeError(r));
@@ -741,6 +759,25 @@ async function sendResponse(payload, meta) {
   renderAll();
   if (rec.needs_follow_up || rec.status === 'negative_outcome') await refreshFollowUps(true);
   return rec;
+}
+
+/**
+ * Body for the live API. intake.ResponsePayload forbids every other key, so identity and extras are never sent.
+ * Answers go to the response route. Failures, declines and opt-outs have no intake route yet (see NOTES-L.md),
+ * so they go to the events route with kind and failure_code.
+ */
+function wirePayload(p) {
+  const w = { response_key: p.response_key, channel: p.channel, delivery_attempt: p.delivery_attempt };
+  if (p.sheet_outcome) w.sheet_outcome = p.sheet_outcome;
+  if (p.kind === 'answer') {
+    w.answers = p.answers;
+    const kinds = Object.keys(p.input_kinds || {}).map(function (k) { return p.input_kinds[k]; });
+    if (kinds.length) w.input_kind = kinds[kinds.length - 1];
+  } else {
+    w.kind = p.kind;
+    w.failure_code = p.failure_code;
+  }
+  return w;
 }
 
 function afterRecord(payload, rec, meta) {
@@ -837,8 +874,8 @@ async function refreshFollowUps(quiet) {
     const r = state.lastRecord;
     if (r && r.needs_follow_up && !state.followUps.some(function (f) { return f.survey_id === r.survey_id; })) {
       state.followUps.push({
-        survey_id: r.survey_id, source_insight_ids: r.source_insight_ids, reasons: r.follow_up_reasons,
-        accepted_answers: r.answers, created_at: r.recorded_at, status: 'open',
+        follow_up_id: 'FU-' + r.survey_id + '-replay', farmer_id: r.farmer_id, survey_id: r.survey_id, response_key: r.response_key,
+        source_insight_ids: r.source_insight_ids, reasons: r.follow_up_reasons, accepted_answers: r.answers, created_at: r.recorded_at,
       });
     }
     renderPanel5();
@@ -961,17 +998,19 @@ function renderPanel1() {
   const d = state.decided;
   if (d && d.decision) {
     const dec = d.decision;
-    out.append(
+    add(out, 
       h('div', { class: 'chips' },
         chip('rule ' + dec.rule_id, dec.survey ? 'ok' : 'warn'),
         chip(dec.survey ? 'survey' : 'no survey', dec.survey ? 'ok' : 'warn'),
         dec.reason_code ? chip(dec.reason_code, '') : null,
-        dec.timing_profile ? chip(dec.timing_profile, '') : null),
+        dec.timing_profile ? chip(dec.timing_profile, '') : null,
+        d.status ? chip('status: ' + d.status, d.notSent ? 'bad' : '') : null),
+      d.notSent ? h('p', { class: 'alert' }, 'Not sent: ' + d.notSent + (d.reasons && d.reasons.length ? ' (' + d.reasons.join(', ') + ')' : '')) : null,
       state.mode === 'replay' ? h('p', { class: 'replaytag' }, 'REPLAY: decision rebuilt from the pack scenario (R8 for survey rows, R3 for the info-only row).') : null);
-    if (d.suppressed) out.append(h('p', { class: 'alert' }, 'SUPPRESSED: farmer opted out (' + (d.suppressed.reason || 'farmer_opted_out') + '). No hand-off is sent.'));
+    if (d.suppressed) add(out, h('p', { class: 'alert' }, 'SUPPRESSED: farmer opted out (' + (d.suppressed.reason || 'farmer_opted_out') + '). No hand-off is sent.'));
     if (d.survey) {
       const w = d.survey.send_window;
-      out.append(
+      add(out, 
         h('div', { class: 'win' }, h('b', {}, 'Handoff window'), h('div', {}, fmtShort(parseT(w.not_before)) + '  to  ' + fmtShort(parseT(w.not_after)))),
         d.handoff ? h('div', {},
           kv('channel order', d.handoff.channel_order.map(function (c) { return c.channel + (c.wait_hours != null ? ' (' + c.wait_hours + 'h)' : ''); }).join(' > ')),
@@ -984,13 +1023,13 @@ function renderPanel1() {
           h('p', { class: 'muted' }, 'rationale: ' + (d.survey.rationale || '')),
           h('p', { class: 'muted' }, 'self_eval: ' + JSON.stringify(d.survey.self_eval))));
     } else if (d.noSurvey) {
-      out.append(h('div', { class: 'win' }, h('b', {}, 'NoSurvey (pack schema)'), h('div', {}, d.noSurvey.reason_code + ': ' + d.noSurvey.reason)));
+      add(out, h('div', { class: 'win' }, h('b', {}, 'NoSurvey (pack schema)'), h('div', {}, d.noSurvey.reason_code + ': ' + d.noSurvey.reason)));
     }
-    out.append(h('details', {}, h('summary', {}, 'DecisionRecord JSON'), pre(dec)));
+    add(out, h('details', {}, h('summary', {}, 'DecisionRecord JSON'), pre(dec)));
   } else if (d) {
-    out.append(h('p', { class: 'alert' }, 'No decision record in the response.'));
+    add(out, h('p', { class: 'alert' }, 'No decision record in the response.'));
   } else {
-    out.append(h('p', { class: 'muted' }, 'Nothing decided yet.'));
+    add(out, h('p', { class: 'muted' }, 'Nothing decided yet.'));
   }
   mount('#p1', h('div', {}, h('label', { for: 'scenario' }, 'Scenario insight'), sel, insBox, btn, out));
 }
@@ -1154,7 +1193,7 @@ function renderPanel4() {
   };
   const out = h('div', { class: 'result' });
   if (rec) {
-    out.append(
+    add(out, 
       h('div', { class: 'chips' }, chip(rec.status, ['completed', 'partial', 'negative_outcome'].indexOf(rec.status) >= 0 ? 'ok' : (rec.status === 'duplicate' || rec.status === 'declined' ? 'warn' : 'bad')),
         rec.failure_code ? chip(rec.failure_code, 'bad') : null,
         chip('retry: ' + rec.retry_decision, ''),
@@ -1163,7 +1202,7 @@ function renderPanel4() {
       state.mode === 'replay' ? h('p', { class: 'replaytag' }, 'REPLAY: this ResponseRecord was built in the page from the embedded outcome_codes table.') : null,
       h('details', { open: 'open' }, h('summary', {}, 'ResponseRecord JSON'), pre(rec)));
   } else {
-    out.append(h('p', { class: 'muted' }, 'No response sent yet. Tap an answer in panel 3.'));
+    add(out, h('p', { class: 'muted' }, 'No response sent yet. Tap an answer in panel 3.'));
   }
   const hist = state.history.length ? h('ul', { class: 'hist' }, state.history.slice(0, 6).map(function (x) {
     return h('li', {}, fmtShort(x.at).slice(5) + '  ' + x.channel + '  ' + x.status + (x.code ? ' / ' + x.code : ''));
@@ -1209,7 +1248,7 @@ function init() {
   $('#signin').addEventListener('submit', function (e) { e.preventDefault(); signIn(); });
   $('#modeSwitch').addEventListener('change', function (e) { setMode(e.target.checked ? 'replay' : 'live'); });
   $('#resetAll').addEventListener('click', function () { location.reload(); });
-  ['decide', 'respond', 'followups'].forEach(function (k) { $('#route-' + k).value = DEFAULT_ROUTES[k]; });
+  ['decide', 'respond', 'events', 'followups'].forEach(function (k) { $('#route-' + k).value = DEFAULT_ROUTES[k]; });
   renderConfig();
   renderAll();
 }

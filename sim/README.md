@@ -26,15 +26,22 @@ Steps 1 and 6 are text cards: they have no numbers, because numbers belong in `e
 
 ## Routes the page calls (LIVE)
 
+Shapes follow `mel/api/intake.py` and `mel/api/decide.py` from PR #13 (branch of thread "Wave 1 J").
+
 | Call | Route (editable in the page) | Body |
 |---|---|---|
-| decide | `POST /surveys/decide` | `{"insight": {...}}` |
-| response | `POST /surveys/{survey_id}/responses` | `response_key, channel, kind (answer, failure, decline, opt_out), failure_code, answers, raw_inputs, input_kinds, sheet_outcome, delivery_attempt, at` |
-| follow-ups | `GET /follow-ups` | none |
+| decide | `POST /surveys/decide` | the insight JSON itself. `farmer_id` is set to the token's `custom:farmer_id` (else the server answers 403 `identity_mismatch`) |
+| answer | `POST /surveys/{survey_id}/responses` | `response_key, channel, answers, delivery_attempt`, plus `sheet_outcome` (app, web only) and `input_kind` when set |
+| failure, decline, opt-out | `POST /surveys/{survey_id}/events` | `response_key, channel, delivery_attempt, kind, failure_code`, plus `sheet_outcome`. **No such route exists in J's code. See NOTES-L.md.** |
+| follow-ups | `GET /follow-ups` | none. The ledger has `list_follow_ups`, but J has no route for it. |
 
-Every call sends `Authorization: Bearer <ID token>`. The page never sends `farmer_id` or `org_id` as its own field.
-The only farmer id in a body is the one inside the pack insight. The server must ignore it and use the JWT claims.
+The answer body has only the keys `ResponsePayload` allows (it forbids all others, so identity keys would be a 400).
+Every call sends `Authorization: Bearer <ID token>`. The page never sends `farmer_id` or `org_id` as a body field of its own.
 The page shows the `custom:farmer_id` and `custom:org_id` claims after sign-in. It decodes the token for display only.
+
+Errors: the page shows `HTTP <status>: <error code>` from a `{"error": "<code>"}` body.
+Codes from J: `invalid_request` 400, `unauthorized` 401, `identity_mismatch` 403, `unknown_survey` 404, `unknown_flow` 404, `invalid_answer` 422, `internal_error` 500.
+Decide statuses the page understands: `survey_scheduled`, `no_survey`, `opted_out`, `timing_exception`, `failed_review`, `pending_review`.
 
 ## REPLAY details
 

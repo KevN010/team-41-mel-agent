@@ -2,23 +2,35 @@
 
 Written for the integration agent. Nothing here changes a file I do not own.
 
-## Assumptions about the API (J and integration: please confirm or tell me the real shape)
-- Routes: `POST /surveys/decide`, `POST /surveys/{survey_id}/responses`, `GET /follow-ups`. No route list existed when I built the page.
-  Routes are editable in the page.
-- decide request: `{"insight": {...}}`. Response is read flexibly: `decision` (or `decision_record`, or a flat DecisionRecord),
-  `survey` (or `handoff.survey`), `handoff` (or `schedule_handoff`), `no_survey`.
-- response request: see sim/README.md. `kind` is one of `answer`, `failure`, `decline`, `opt_out`. This matches the event kinds in tests/outcome_events.py.
-  Response is read as a ResponseRecord, or `{response: ResponseRecord}`.
-- follow-ups response: an array, or `{items: [...]}`, or `{follow_ups: [...]}`.
-- Opt-out suppression: after an opt-out, the page expects decide to say so with `suppressed` (object or true), or `status: "suppressed"`,
-  or an error with `code: "farmer_opted_out"` on HTTP 403 or 409. J decides the real shape. In REPLAY the page shows a red SUPPRESSED box.
-- Token: the page sends the Cognito ID token as the Bearer value, because the claims `custom:farmer_id` and `custom:org_id` are ID token claims.
+## Alignment with J (PR #13, `mel/api/intake.py`, `mel/api/decide.py`)
+Done in the page:
+- Answer body is limited to `ResponsePayload` keys: `response_key, channel, answers, sheet_outcome, delivery_attempt, input_kind`.
+  `language` and `flow_key` are not sent (both are optional and checked against the survey).
+- `sheet_outcome` is sent for app and web only.
+- Decide body is the insight JSON. `farmer_id` is replaced with the token's `custom:farmer_id`, because `run_decision` returns 403 `identity_mismatch`
+  when the insight farmer is not the JWT farmer. The pack insights carry other farmer ids.
+- Error body `{"error": "<code>"}` is read. Duplicate is HTTP 200 with a `duplicate` record, stored answers HTTP 201.
+- Decide response: `DecisionResult` fields `status, decision, no_survey, survey, handoff, reasons` are read. `status: opted_out` shows the red SUPPRESSED box.
+  `timing_exception`, `failed_review` and `pending_review` show "Not sent".
+- Follow-up items use J's `FollowUpItem` fields.
+
+Gaps (integration must add, or the demo steps below cannot run LIVE):
+1. **No route for non-answer events.** Intake only handles `kind: answer`. Demo step 5 needs push_token_invalid, client_cannot_render, opt-out,
+   and Decline. The page posts them to `POST /surveys/{survey_id}/events` with `kind` (`failure`, `decline`, `opt_out`), `failure_code`, `sheet_outcome`.
+   That route is my guess. It must call `apply_event` for the failure kinds, and `ledger.set_opt_out` for `opt_out`. Returned record: same as intake.
+   The page shows a clear message if the route answers 404 without an `error` code.
+2. **Closing the sheet with no answer** (`sheet_dismissed`) goes through the same events route. Intake rejects an empty body without `sheet_outcome`.
+3. **No `decide` or `follow-ups` route exists yet** (only functions). The page assumes `POST /surveys/decide` and `GET /follow-ups`
+   returning an array, `{items: []}` or `{follow_ups: []}`. Editable in the page.
+4. **Fallback after delivery failure** needs the record's `retry_decision == fall_back_to_next_channel`. The page then moves to the next channel in the
+   hand-off and uses `delivery_attempt + 1` in the next `response_key`. J stores partial and complete as two records with two keys, same as the page.
+5. Opt-out suppression: `run_decision` returns status `opted_out` only after rules and timing pass, so Decide on a no-survey insight still returns `no_survey`.
 
 ## Clock (needs a decision)
-The virtual clock is only in the page. The page sends `at` (virtual time, +05:30) in each response body.
-The pack scenarios have windows in Dec 2026 and Jan 2027. A server with a real clock will not see those windows as open.
-For the live demo the server needs a demo clock. Do not trust a client header on a production path. Suggested: a setting (off by default)
-that makes intake use `at` from the body, only for the demo stack, or a seeded FakeClock endpoint behind an admin claim. Not built here.
+The virtual clock is only in the page. `ResponsePayload` has no time field, so the page cannot send it (an `at` key would be a 400).
+The pack scenarios have windows in Dec 2026 and Jan 2027. A server with a real clock does not see those windows as open, and `SystemClock` stamps the records.
+For the live demo the server needs its own demo clock (for example a `FakeClock` set by the deploy for the demo stack). Do not trust a client header on a production path.
+Not built here.
 
 ## Pack disagreements and choices
 - `schedule_handoff.json` for scenario 3 (and the others, same pattern) embeds the hi-IN survey, while `survey.en-IN.json` is the en-IN survey.
@@ -35,4 +47,4 @@ that makes intake use `at` from the body, only for the demo stack, or a seeded F
 - Replay ResponseRecord builder vs 5 channel files under `scenarios/3-potato-blight-wait/responses` and 15 files under `outcomes/`: 20 records, 0 differences
   (ignoring `response_key`, `language`, timestamps, `raw_event`, and voice `items`).
 - Headless Chromium on `file://` at 390 px wide: REPLAY walks all 6 steps, no console errors, no network requests, no horizontal scroll.
-- LIVE path tested against a local mock server (decide, response, follow-ups, network failure banner). Cognito sign-in was not tested: no pool available.
+- LIVE path tested against a local mock server that rejects extra body keys like `ResponsePayload` and returns J's `{"error": code}` and decide `status` values. Covered: decide, answer, events-route-missing message, opted_out suppression, network failure banner. Cognito sign-in was not tested: no pool available.

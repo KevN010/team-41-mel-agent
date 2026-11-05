@@ -1,0 +1,12 @@
+FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:3.12-slim
+WORKDIR /app
+ARG REQUIREMENTS_FILE=infra/agent-requirements.txt
+COPY ${REQUIREMENTS_FILE} /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home agent
+ARG MEL_SOURCE=infra/stub/mel
+COPY ${MEL_SOURCE} /app/mel
+COPY models /app/models
+USER 10001
+EXPOSE 8080
+CMD ["python", "-m", "mel.agent"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ping', timeout=4)"

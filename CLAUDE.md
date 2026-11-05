@@ -57,3 +57,16 @@ models/         candidates.txt, models.yaml, eval results
 evals/          survey eval harness
 scripts/        day0_bedrock.py, evidence_bundle.py
 prompts/        agent task prompts (this kit)
+
+## Infrastructure (owned by GPT, not by Claude threads)
+Infrastructure is built and deployed separately. Never edit infra/, scripts/deploy.sh, scripts/package_lambda.sh
+or scripts/seed_users.py. Read infra/INFRA.md for resource names, URLs and commands.
+The application reads configuration only from these environment variables, with SSM parameters under /mel/ as
+the fallback when an env var is unset: MEL_REGION, MEL_TABLE, MEL_ARTIFACTS_BUCKET, MEL_FOLLOWUP_QUEUE_URL,
+MEL_JEV_SECRET_ARN, MEL_USER_POOL_ID, MEL_USER_POOL_CLIENT_ID, MEL_MODELS_FILE, MEL_METRICS_NAMESPACE.
+Lambda handler must be mel.api.handler.lambda_handler. Container entrypoint must be `python -m mel.agent`.
+DynamoDB keys: pk, sk, GSI1 (gsi1pk, gsi1sk), TTL attribute ttl. Table name comes from MEL_TABLE.
+Custom metrics namespace MelAgent; metric names DecisionsByRule, ModelCalls, ModelTokens, JudgeVerdicts,
+LatencyMs, CostUsd. JWT claims: sub, custom:farmer_id, custom:org_id.
+To redeploy application code: `bash scripts/package_lambda.sh && cd infra && cdk deploy MelAgent-Api`
+and for the agent container the commands in infra/INFRA.md. Only the integration thread runs these.

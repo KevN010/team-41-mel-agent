@@ -102,10 +102,10 @@ Put the Jev key into Secrets Manager by hand. Do not commit it.
 
 ## Known gaps at this commit
 
-- `mel/agent.py` (the AgentCore entrypoint) and `mel/api/handler.py` (the Lambda handler) are not on `main` yet. The integration step adds them.
-- The simulator calls `POST /surveys/{id}/events` and `GET /follow-ups`. No route for either exists in `mel/api` yet. See `sim/README.md`.
-- `evidence/` is gitignored. `evidence/REPORT.md` and `evidence/e2e-run-1.md` are built on the operator's machine.
-- `KNOWN-ISSUES.md` is not in the repository yet.
+- `mel/agent.py` (the AgentCore entrypoint), `mel/api/handler.py` (the Lambda handler), `KNOWN-ISSUES.md` and `evidence/e2e-run-1.md` are on PR #23, not on `main` yet.
+- The routes the simulator uses (`GET /follow-ups`, and `POST /surveys/{id}/responses` with `kind` for failures and opt-outs) are on PR #23. See `sim/README.md`.
+- The Lambda path with a sign-in is not traced end to end yet. The trace runs through the AgentCore Runtime. See `KNOWN-ISSUES.md`.
+- `evidence/` is gitignored. `evidence/REPORT.md` is on branch `claude/project-thread-3nz941`, not on `main`.
 
 ## More
 

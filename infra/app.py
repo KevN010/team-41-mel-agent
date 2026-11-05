@@ -160,8 +160,8 @@ class Agent(cdk.Stack):
             lifecycle_rules=[ecr.LifecycleRule(max_image_count=10)], removal_policy=cdk.RemovalPolicy.RETAIN)
         policy = iam.Policy(self, "RuntimePolicy", statements=[
             iam.PolicyStatement(actions=["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"], resources=[
-                "arn:aws:bedrock:*::foundation-model/openai.*", "arn:aws:bedrock:*::foundation-model/anthropic.*",
-                self.format_arn(service="bedrock", resource="inference-profile", resource_name="*"),
+                self.format_arn(service="bedrock", region="*", resource="inference-profile", resource_name="global.openai.gpt-6-luna"),
+                "arn:aws:bedrock:*::foundation-model/openai.gpt-6-luna",
                 self.format_arn(service="bedrock", resource="project", resource_name="default")]),
             iam.PolicyStatement(actions=["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem",
                 "dynamodb:BatchGetItem", "dynamodb:BatchWriteItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:DescribeTable",

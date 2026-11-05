@@ -225,7 +225,7 @@ table.why th{border-top:1.5px solid var(--faint)}
 </section>
 
 <!-- ============ SLIDE 2 ============ -->
-<section class="slide" data-n="2" data-steps="13" data-star="A">
+<section class="slide" data-n="2" data-steps="12" data-star="A">
   <div class="kicker"><b>2</b> &nbsp;Solution architecture</div>
   <h1 style="font-size:60px">One request path. One data path.</h1>
   <div class="s2-grid">
@@ -233,7 +233,7 @@ table.why th{border-top:1.5px solid var(--faint)}
       <ul class="legend">
         <li><svg width="70" height="14"><line x1="0" y1="7" x2="70" y2="7" stroke="#2E6B3F" stroke-width="4"/></svg>Request path</li>
         <li><svg width="70" height="14"><line x1="0" y1="7" x2="70" y2="7" stroke="#2F5E86" stroke-width="4" stroke-dasharray="10 6"/></svg>Data path</li>
-        <li><svg width="70" height="24"><rect x="2" y="2" width="66" height="20" fill="none" stroke="#C7860A" stroke-width="2.5" stroke-dasharray="8 6"/></svg>Not confirmed yet</li>
+        <li><svg width="70" height="24"><rect x="2" y="2" width="66" height="20" fill="none" stroke="#1D2420" stroke-width="2" stroke-dasharray="4 5"/></svg>Outside the AWS application</li>
       </ul>
       <div class="svcpanel" id="svcpanel"></div>
     </div>
@@ -250,7 +250,7 @@ table.why th{border-top:1.5px solid var(--faint)}
       <!-- compute group -->
       <rect x="470" y="196" width="280" height="264" fill="none" stroke="#1D2420" stroke-width="1.5" stroke-dasharray="2 5"/>
       <text x="482" y="218" style="font-size:15px;font-weight:700;letter-spacing:.1em;fill:#6e6f68">APPLICATION CODE: mel</text>
-      <text x="206" y="636" style="font-size:15px;font-weight:700;letter-spacing:.1em;fill:#6e6f68">OBSERVE AND CONTROL COST</text>
+      <text x="206" y="636" style="font-size:15px;font-weight:700;letter-spacing:.1em;fill:#6e6f68">OBSERVE</text>
 
       <!-- request path arrows -->
       <path data-s="0 1" class="req" d="M85 240V102H218" marker-end="url(#mreq)"/>
@@ -258,8 +258,8 @@ table.why th{border-top:1.5px solid var(--faint)}
       <path data-s="2 3" class="req" d="M420 278H488" marker-end="url(#mreq)"/>
       <path data-s="3 4 5" class="req" d="M590 196V142" marker-end="url(#mreq)"/>
       <path data-s="3 4 7" class="req" d="M750 420H766V560H1038" marker-end="url(#mreq)"/>
-      <path data-s="0 11" class="req pend" d="M85 316V558H218" marker-end="url(#mpen)"/>
-      <path data-s="11 10" class="req pend" d="M420 558H478" marker-end="url(#mpen)"/>
+      <path data-s="0 11" class="req" d="M85 316V558H218" marker-end="url(#mreq)"/>
+      <path data-s="11 10" class="req" d="M420 558H478" marker-end="url(#mreq)"/>
       <!-- data path arrows -->
       <path data-s="3 4 8" class="dat" d="M750 274H788" marker-end="url(#mdat)"/>
       <path data-s="3 4 9" class="dat" d="M750 394H788" marker-end="url(#mdat)"/>
@@ -279,9 +279,8 @@ table.why th{border-top:1.5px solid var(--faint)}
       <g class="svc" data-i="8"><rect class="box" x="790" y="236" width="210" height="76" rx="6"/><text class="nm" x="804" y="268">DynamoDB</text><text class="sb" x="804" y="294">table mel-ledger</text></g>
       <g class="svc" data-i="9"><rect class="box" x="790" y="356" width="210" height="76" rx="6"/><text class="nm" x="804" y="388">SQS</text><text class="sb" x="804" y="414">follow-up queue</text><rect class="box" x="815" y="452" width="150" height="48" rx="6"/><text class="sb" x="830" y="482" style="fill:#1D2420;font-weight:600">DLQ</text></g>
       <g class="svc" data-i="10"><rect class="box" x="480" y="520" width="220" height="76" rx="6"/><text class="nm" x="494" y="552">S3</text><text class="sb" x="494" y="578">simulator, artifacts</text></g>
-      <g class="svc pending" data-i="11"><rect class="box" x="220" y="520" width="200" height="76" rx="6"/><text class="nm" x="234" y="552">CloudFront</text><text class="sb" x="234" y="578" style="fill:#8a5d06;font-weight:700">PENDING</text></g>
-      <g class="svc" data-i="12"><rect class="box" x="480" y="650" width="220" height="76" rx="6"/><text class="nm" x="494" y="682">CloudWatch</text><text class="sb" x="494" y="708">dashboard, alarms</text></g>
-      <g class="svc" data-i="13"><rect class="box" x="790" y="650" width="210" height="76" rx="6"/><text class="nm" x="804" y="682">AWS Budgets</text><text class="sb" x="804" y="708">monthly budget</text></g>
+      <g class="svc" data-i="11"><rect class="box" x="220" y="520" width="200" height="76" rx="6"/><text class="nm" x="234" y="552">CloudFront</text><text class="sb" x="234" y="578">simulator, HTTPS</text></g>
+      <g class="svc" data-i="12"><rect class="box" x="480" y="650" width="220" height="76" rx="6"/><text class="nm" x="494" y="682">CloudWatch</text><text class="sb" x="494" y="708">dashboard, 2 alarms</text></g>
     </svg>
   </div>
   <div class="hint">Press <kbd>→</kbd> to show each service in turn.</div>
@@ -293,7 +292,7 @@ table.why th{border-top:1.5px solid var(--faint)}
   <h1 style="font-size:60px">One insight, 13 steps, 2 model calls.</h1>
   <div class="track" id="track"><div id="token"></div></div>
   <div class="detail" id="detail"></div>
-  <div class="foot"><b>Timing profiles.</b> golden_v1 is the default and follows the golden send windows. rules_v1 applies rules.json window_rules exactly.</div>
+  <div class="foot"><b>Timing profiles.</b> golden_v1 is the default and matches 95 of 95 golden send windows. rules_v1 applies rules.json window_rules exactly.</div>
   <div class="hint">Press <kbd>→</kbd> to move the insight one step.</div>
 </section>
 
@@ -320,27 +319,27 @@ table.why th{border-top:1.5px solid var(--faint)}
     <div class="tile">
       <div class="v">150<small> / 150</small></div>
       <div class="l">Golden-set decisions that match, with 0 model calls</div>
-      <div class="s">Wave 0 rule check in CONTRACTS.md. <span class="chip">pending <i>evidence/REPORT.md</i></span></div>
+      <div class="s">Rule id, reason code and survey flag all match. Source: evidence/REPORT.md.</div>
     </div>
     <div class="tile">
-      <div class="v"><span class="chip" style="font-size:30px">pending</span><small> / 183</small></div>
+      <div class="v">183<small> / 183</small></div>
       <div class="l">Outcome fixtures that pass</div>
-      <div class="s">The total of 183 comes from pack/README.txt. <span class="chip">pending <i>evidence/REPORT.md</i></span></div>
+      <div class="s">Each pack fixture passes through the outcome state machine. Source: evidence/REPORT.md.</div>
     </div>
     <div class="tile">
-      <div class="v">$0.000210</div>
+      <div class="v">$0.000818</div>
       <div class="l">Cost for each accepted survey, <span style="white-space:nowrap">gpt-6-luna</span></div>
-      <div class="s">Generation only, in the model eval. The list price is not verified. <span class="chip">pending <i>evidence/REPORT.md</i></span></div>
+      <div class="s">Failed calls are counted. Without them, the cost is $0.000568. 5 of 5 surveys passed. Prices are not verified.</div>
     </div>
     <div class="tile">
-      <div class="v"><span class="chip" style="font-size:30px">pending</span></div>
-      <div class="l">Latency p50 and p95, end to end</div>
-      <div class="s">The model call alone has a p50 of 1146 ms in the eval. <span class="chip">pending <i>evidence/REPORT.md</i></span></div>
+      <div class="v">2,577<small> / 4,105 ms</small></div>
+      <div class="l">Latency p50 and p95 for each model call</div>
+      <div class="s">Measured on Bedrock in us-west-2 over 7 model calls. Source: evidence/REPORT.md.</div>
     </div>
   </div>
   <table class="why">
-    <tr><th>Cost</th><td>Decisions, timing and outcomes are deterministic code. The eval chose <span style="white-space:nowrap">gpt-6-luna</span>: 15 of 15 passed at the lowest priced cost. Prompt caching <span class="chip">pending <i>not in listed files</i></span></td></tr>
-    <tr><th>Security</th><td>Farmer identity comes from the JWT only. Each component has its own least-privilege IAM role. The Jev key stays in Secrets Manager. A Jev failure holds the survey for review. Adversarial review <span class="chip">pending <i>REVIEW.md pass count</i></span></td></tr>
+    <tr><th>Cost</th><td>Decisions, timing and outcomes are deterministic code. Cheapest Bedrock model chosen by eval: <span style="white-space:nowrap">gpt-6-luna</span>, 5 of 5 accepted.</td></tr>
+    <tr><th>Security</th><td>Farmer identity comes from the JWT only. IAM policies list explicit actions, with no wildcard actions. The Jev key stays in Secrets Manager. A Jev failure holds the survey for review. The adversarial review checked 15 items, and 12 are closed with PR #23.</td></tr>
     <tr><th>Simplicity</th><td>One Python package, mel. One DynamoDB table. One static simulator page. One deploy script.</td></tr>
   </table>
   <p class="close">Every piece of advice gets a <b>measured outcome</b>. Farmers with bad outcomes <b>get help</b>.</p>
@@ -373,9 +372,9 @@ function chip(src){return '<span class="chip">pending <i>'+esc(src)+'</i></span>
 
 /* ---------- slide 2 data ---------- */
 var SVC=[
- [0,"Overview","The diagram shows the services in infra/README.md. infra/INFRA.md is not on main yet."],
+ [0,"Overview","The diagram shows the deployed services in infra/INFRA.md and the external Jev service."],
  [1,"Cognito","Cognito signs in the farmer and issues a JWT that carries farmer_id and org_id."],
- [2,"API Gateway","API Gateway checks the JWT, validates each request and throttles at rate 1, burst 10."],
+ [2,"API Gateway","The HTTP API checks the JWT and throttles at rate 1, burst 10. The Lambda validates the payload."],
  [3,"Lambda","The Lambda function mel-api runs the agent code for each API request."],
  [4,"AgentCore Runtime","AgentCore Runtime runs the agent as a container from the ECR repository mel-agent."],
  [5,"Bedrock","Bedrock runs gpt-6-luna through a global cross-region inference profile, called from us-west-2."],
@@ -384,9 +383,8 @@ var SVC=[
  [8,"DynamoDB","DynamoDB holds the ledger in one table, scoped by org_id and farmer_id."],
  [9,"SQS with DLQ","SQS holds the follow-up queue. The dead-letter queue keeps messages that fail."],
  [10,"S3","S3 holds the simulator page and the artifacts, with public access blocked."],
- [11,"CloudFront","CloudFront for the simulator is not confirmed. "+chip("infra/INFRA.md")],
- [12,"CloudWatch","CloudWatch shows the MelAgent metrics on a dashboard and raises alarms."],
- [13,"AWS Budgets","AWS Budgets sets a monthly cost budget."]
+ [11,"CloudFront","CloudFront serves the simulator page over HTTPS from the private S3 bucket."],
+ [12,"CloudWatch","CloudWatch shows the MelAgent metrics on the mel-agent dashboard. 2 alarms watch the DLQ and the model call rate."]
 ];
 var arch=document.getElementById("arch");
 function renderS2(step){
@@ -397,7 +395,7 @@ function renderS2(step){
   arch.classList.toggle("focus",step>0);
   var d=SVC[step];
   document.getElementById("svcpanel").innerHTML=
-    '<div class="n">'+(step?("Service "+step+" of 13"):"13 services")+'</div><h2>'+d[1]+'</h2><p>'+d[2]+'</p>';
+    '<div class="n">'+(step?("Service "+step+" of 12"):"12 services")+'</div><h2>'+d[1]+'</h2><p>'+d[2]+'</p>';
 }
 
 /* ---------- slide 3 data ---------- */
@@ -407,7 +405,7 @@ var STEPS=[
    ["R1|junk_insight","R2|critical_needs_human_call","R3|nothing_to_verify","R4|waiting_for_details","R5|no_check_needed","R6|window_after_season","R7|crop_already_harvested","R8|survey"]],
  ["Timing profile",0,"The timing profile sets the send window from the verification timing.",["|golden_v1 is the default profile.","|rules_v1 applies rules.json window_rules."]],
  ["Handoff",0,"The handoff builds the schedule record for the scheduler.",["|Channel order and wait hours","|Frequency cap","|Priority","|Expiry time"]],
- ["Generation on Bedrock",1,"Bedrock writes 1 to 3 tap questions in the farmer's language. The limit is 600 output tokens.",["|Model: gpt-6-luna","|Insight text goes in the user turn, never in the system prompt."]],
+ ["Generation on Bedrock",1,"Bedrock writes 1 to 3 tap questions in the farmer's language. max_tokens is 600 in models.yaml.",["|Model: gpt-6-luna","|The eval run used max_tokens 900.","|Insight text goes in the user turn, never in the system prompt."]],
  ["Validation and invariants",0,"Code validates the survey against the pack schema and the invariants. Our validator sets schema_valid.",["|1 to 3 items","|Unique item_id","|2 to 10 options","|Labels of 20 code points or fewer","|Scales of 10 steps or fewer"]],
  ["5 Jev checks",2,"Jev answers 5 typed questions about the final survey. A Jev failure holds the survey for review.",["|matches_advice","|gives_new_advice","|asks_personal_info","|inappropriate_content","|language_matches_tag"]],
  ["Ledger",0,"The ledger stores the survey. Every read and write is scoped by org_id and farmer_id.",null],
@@ -455,11 +453,11 @@ function renderS3(step){
 }
 
 /* ---------- slide 4 data ---------- */
-var CHECKS=[1,2,3,4,5,6];
+var CHECKS=[[1,"The outcome"],[2,"Potato insight to survey"],[3,"Clock, sheet and follow-up"],[4,"Zero tillage insight: no survey"],[5,"Failures: push, partial, duplicate, opt-out"],[6,"Evidence"]];
 var checksEl=document.getElementById("checks"), ticked={};
-CHECKS.forEach(function(n){
-  var li=document.createElement("li");li.setAttribute("data-k",n);
-  li.innerHTML='<span class="bx"></span><span class="lbl">Step '+n+' '+chip("DEMO.md")+'</span>';
+CHECKS.forEach(function(c){
+  var n=c[0],li=document.createElement("li");li.setAttribute("data-k",n);
+  li.innerHTML='<span class="bx"></span><span class="lbl"><b>'+n+'</b>&nbsp; '+esc(c[1])+'</span>';
   li.addEventListener("click",function(e){e.stopPropagation();toggleCheck(n);});
   checksEl.appendChild(li);
 });
@@ -470,17 +468,18 @@ var O="pack/json/outcomes/app/survey-single-select/";
 function rec(rows){return '<div class="rec">'+rows.map(function(r){
   return '<div'+(r[2]?' class="'+r[2]+'"':'')+'><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>';}).join("")+'</div>';}
 var FRAMES=[
- {t:"Potato survey in Hindi",src:P+"survey.hi-IN.json and survey.en-IN.json",one:true,html:
+ {t:"Potato survey in English",src:P+"survey.en-IN.json and survey.hi-IN.json",one:true,html:
   '<div class="sq">'+
-  '<div class="item"><div class="hi">क्या आपने पिछले 3 दिनों में आलू के पत्ते देखे?</div><div class="en">Did you check the potato leaves in the last 3 days?</div><div class="opts"><span>हाँ</span><span>नहीं</span></div></div>'+
-  '<div class="item"><div class="hi">भूरे धब्बों का अब क्या हाल है?</div><div class="en">What is happening to the brown spots?</div><div class="opts"><span>नए धब्बे नहीं</span><span>पहले जैसे ही</span><span>फैल रहे हैं</span><span>सफ़ेद फफूंद दिखी</span></div></div>'+
-  '<div class="item"><div class="hi">सलाह कितनी काम की रही? 1 मतलब बिल्कुल नहीं, 5 मतलब बहुत काम की।</div><div class="en">How useful was the advice? 1 means not useful, 5 means very useful.</div><div class="opts"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div></div>'+
+  '<div class="item"><div class="hi">Did you check the potato leaves in the last 3 days?</div><div class="en">क्या आपने पिछले 3 दिनों में आलू के पत्ते देखे?</div><div class="opts"><span>Yes</span><span>No</span></div></div>'+
+  '<div class="item"><div class="hi">What is happening to the brown spots?</div><div class="en">भूरे धब्बों का अब क्या हाल है?</div><div class="opts"><span>No new spots</span><span>Same as before</span><span>Spreading</span><span>White growth seen</span></div></div>'+
+  '<div class="item"><div class="hi">How useful was the advice? 1 means not useful, 5 means very useful.</div><div class="en">सलाह कितनी काम की रही? 1 मतलब बिल्कुल नहीं, 5 मतलब बहुत काम की।</div><div class="opts"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div></div>'+
+  '<p class="src" style="margin-top:10px">The agent builds en-IN only. Hindi is not built yet. The grey lines show the pack hi-IN text.</p>'+
   '</div>'},
- {t:"App bottom sheet, step 2 of 3",src:P+"render/hi-IN/app.json",html:
+ {t:"App bottom sheet, step 2 of 3",src:P+"render/en-IN/app.json",html:
   '<div class="phone"><div class="chat">FarmerChat</div><div class="sheet"><div class="grab"></div>'+
-  '<div class="t">आपको मिली सलाह पर एक छोटा सवाल · 3 में से 2</div><div class="q">भूरे धब्बों का अब क्या हाल है?</div>'+
-  '<span class="opt">नए धब्बे नहीं</span><span class="opt">पहले जैसे ही</span><span class="opt tap">फैल रहे हैं</span><span class="opt">सफ़ेद फफूंद दिखी</span>'+
-  '<div class="row"><span>छोड़ें</span><span>बंद करें</span></div></div></div>'+
+  '<div class="t">A quick question about the advice you got · 2 of 3</div><div class="q">What is happening to the brown spots?</div>'+
+  '<span class="opt">No new spots</span><span class="opt">Same as before</span><span class="opt tap">Spreading</span><span class="opt">White growth seen</span>'+
+  '<div class="row"><span>Skip</span><span>Close</span></div></div></div>'+
   rec([["presentation","bottom_sheet"],["opens_when","push_tapped, next_app_open"],["waits_for","answer finished, no typing for 5 seconds, no call"],["one_question_per_step","true"],["can_skip, can_close","true, true"]])},
  {t:"Answer: spreading",src:P+"responses/whatsapp.json",one:true,html:
   rec([["survey_id","S-21310"],["channel","whatsapp"],["answers","q1 yes · q2 spreading · q3 2"],["status","negative_outcome","bad"],["counts_toward_cap","true"],["needs_follow_up","true","hot"],["follow_up_reasons","crop_or_animal_damaged","hot"]])},
@@ -506,12 +505,12 @@ function renderS4(step){
   frame.classList.toggle("live",state.live);
   if(state.live){
     frame.innerHTML='<div class="fhead"><span class="mode liveon">LIVE</span><span class="ttl">Simulator</span><span class="cnt">Press L for the replay</span></div>'+
-      '<div class="livebox"><div>Simulator URL</div>'+chip("infra/INFRA.md")+'<div style="font-size:20px">Open the simulator in a browser tab next to this deck.</div></div>';
+      '<div class="livebox"><div>Simulator URL</div><div style="font-size:34px;font-weight:700;color:var(--ink)">https://d3eb8n1ufruyva.cloudfront.net</div><div style="font-size:20px">Open the simulator in a browser tab next to this deck.</div><div style="font-size:20px">For the simulator replay, add ?replay=1 to the URL.</div></div>';
     return;
   }
   var f=FRAMES[step];
   frame.innerHTML='<div class="fhead"><span class="mode replay">REPLAY</span><span class="ttl">'+esc(f.t)+'</span><span class="cnt">Frame '+(step+1)+' of '+FRAMES.length+'</span></div>'+
-    '<div class="fbody'+(f.one?" one":"")+'">'+f.html+'</div><div class="fsrc">Recorded pack record: '+esc(f.src)+'</div>';
+    '<div class="fbody'+(f.one?" one":"")+'">'+f.html+'</div><div class="fsrc">Recorded pack record, the same data as the simulator replay: '+esc(f.src)+'</div>';
 }
 
 /* ---------- notes ---------- */
@@ -531,14 +530,15 @@ var NOTES=[
   "Green arrows show the request path. Blue arrows show the data path.",
   "Cognito signs in the farmer and issues a JWT.",
   "API Gateway checks the JWT and sends the request to the Lambda function.",
+  "The Lambda function validates the payload, because an HTTP API has no request validator.",
   "AgentCore Runtime runs the same agent code as a container.",
   "Bedrock runs gpt-6-luna through a cross-region inference profile.",
   "The Jev key stays in Secrets Manager. Jev is outside AWS.",
   "DynamoDB holds the ledger in one table.",
   "SQS holds the follow-up queue. A dead-letter queue keeps failed messages.",
   "S3 holds the simulator page and the artifacts.",
-  "CloudFront is pending. Do not talk about it until infra/INFRA.md confirms it.",
-  "CloudWatch shows the dashboard and alarms. AWS Budgets sets a monthly budget."]],
+  "CloudFront serves the simulator page from the private S3 bucket.",
+  "CloudWatch shows the dashboard. 2 alarms watch the DLQ and the model call rate."]],
  ["Slide 3. Action: application flow. Target 2:00 to 3:10. Press the right arrow for each step.",[
   "Follow one insight through the agent.",
   "Code checks the insight against the pack schema.",
@@ -554,8 +554,9 @@ var NOTES=[
  ["Slide 4. Action shown live. Target 3:10 to 5:10.",[
   "If the live system fails, press L to show the replay.",
   "Follow the 6 steps in DEMO.md. Tick each step on the slide when you finish it.",
+  "The live simulator is at d3eb8n1ufruyva.cloudfront.net.",
   "The replay uses recorded pack records.",
-  "First, the potato survey in Hindi. The farmer gets 3 questions.",
+  "First, the potato survey in English. Hindi is not built yet. The farmer gets 3 questions.",
   "Next, the bottom sheet in the app. It shows one question for each step.",
   "The farmer taps Spreading. The status becomes negative_outcome.",
   "The agent creates a follow-up item with the reason crop_or_animal_damaged.",
@@ -567,9 +568,11 @@ var NOTES=[
  ["Slide 5. Result. Target 5:10 to 6:00.",[
   "Do not read a pending chip as a number. Say that the number is pending.",
   "The rules match 150 of 150 golden decisions with 0 model calls.",
-  "Generation costs $0.000210 for each accepted survey in the eval. The list price is not verified.",
+  "183 of 183 outcome fixtures pass.",
+  "Each accepted survey costs $0.000818, with failed calls counted. The prices are not verified.",
+  "Each model call takes 2,577 ms at p50 and 4,105 ms at p95.",
   "Cost stays low because decisions are code. The eval chose the model.",
-  "Security comes from JWT identity, least-privilege IAM, secrets off clients and the Jev hold.",
+  "Security comes from JWT identity, explicit IAM actions, secrets off clients and the Jev hold.",
   "Simplicity comes from one package, one table, one static page and one deploy script.",
   "Every piece of advice gets a measured outcome. Farmers with bad outcomes get help."]]
 ];

@@ -57,7 +57,12 @@ Every NOTES-*.md item is either fixed in this branch (marked FIXED) or listed as
   MEL_MODELS_FILE relative to the package root, MEL_METRICS_NAMESPACE, MEL_REGION); SSM `/mel/*` fallback in
   `mel/api/wiring.py`. models.yaml is on main and packaged.
 - Review (a): the Jev key is read from Secrets Manager via MEL_JEV_SECRET_ARN (refreshed every 5 minutes).
-- NOTES-F: System One requires `model` (live 422 without it). `jev-latest` is sent; JEV_MODEL overrides.
+- NOTES-F: System One requires `model` (live 422 without it). `jev-1.14.0` is sent (FarmerChat's client); JEV_MODEL overrides.
+  The key is JEV_API_KEY when that env var is set; otherwise the secret named by MEL_JEV_SECRET_ARN. Infra puts only
+  MEL_JEV_SECRET_ARN (an ARN, not the key) on the Lambda and the container; no JEV_API_KEY is set there.
+  The e2e evidence run used `jev-latest` (deployed before this change); redeploy waits for PR #22.
+- Failed model calls count: a Bedrock answer cut at max_tokens or not JSON keeps its usage, and its tokens and
+  cost are added to the run (input + output + cached input, as Bedrock reports them).
 - Deployed packages had no `pack/`: the runtime subset (schemas, rules, crop calendar) ships in `mel/_pack`,
   checked byte-equal to `pack/` by `tests/test_runtime_config.py`.
 - NOTES-MODEL: OpenAI requests use `reasoning.effort = low`.

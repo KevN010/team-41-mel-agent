@@ -113,6 +113,39 @@ class InfrastructureContract(unittest.TestCase):
                     actions = [actions]
                 self.assertTrue(all("*" not in action for action in actions), actions)
 
+    def test_bedrock_invocation_is_limited_to_selected_luna_profile(self):
+        actions = {"bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"}
+        statements = [
+            statement
+            for policy in self.resources_of_type("AWS::IAM::Policy")
+            for statement in policy["PolicyDocument"]["Statement"]
+            if set(statement.get("Action", [])) == actions
+        ]
+        self.assertEqual(len(statements), 1)
+        statement = statements[0]
+        self.assertEqual(statement["Effect"], "Allow")
+        account = os.environ.get("CDK_DEFAULT_ACCOUNT", "423964648384")
+        pseudo_parameters = {"AWS::AccountId": account, "AWS::Region": "us-west-2", "AWS::Partition": "aws"}
+
+        def resolve(value):
+            if isinstance(value, str):
+                return value
+            if "Ref" in value:
+                return pseudo_parameters[value["Ref"]]
+            if "Fn::Join" in value:
+                separator, parts = value["Fn::Join"]
+                return separator.join(resolve(part) for part in parts)
+            self.fail(f"Unexpected expression in Bedrock resource: {value}")
+
+        resources = [resolve(resource) for resource in statement["Resource"]]
+        self.assertEqual(len(resources), 3)
+        self.assertEqual(set(resources), {
+            f"arn:aws:bedrock:*:{account}:inference-profile/global.openai.gpt-6-luna",
+            "arn:aws:bedrock:*::foundation-model/openai.gpt-6-luna",
+            f"arn:aws:bedrock:us-west-2:{account}:project/default",
+        })
+        self.assertTrue(all(not resource.endswith("*") for resource in resources))
+
     def test_queue_contract(self):
         queues = {q["QueueName"]: q for q in self.resources_of_type("AWS::SQS::Queue")}
         self.assertTrue(queues["mel-followups"].get("SqsManagedSseEnabled") or queues["mel-followups"].get("KmsMasterKeyId"))
